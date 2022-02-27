@@ -130,4 +130,23 @@ bool is_approximately_convex(const PolySet& ps) {
 #endif
 }
 
+void translate(PolySet& ps, const Vector3d& translation)
+{
+  for (auto& p : ps.polygons) {
+    for (auto& v : p) {
+      v += translation;
+    }
+  }
+}
+
+void scale(PolySet &ps, const Vector3d &scale)
+{
+    for(auto &p : ps.polygons) {
+        for(auto &v : p) {
+            v[0] *= scale[0];
+            v[1] *= scale[1];
+            v[2] *= scale[2];
+        }
+    }
+}
 } // namespace PolysetUtils
