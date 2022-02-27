@@ -623,6 +623,9 @@ set(CORE_SOURCES
   src/function.cc
   src/handle_dep.cc
   src/hash.cc
+  src/GeometryEvaluator2.cc
+  src/HelicoidalExtrude.cc
+  src/HelicoidalExtrudeNode.h
   src/import.cc
   src/import_3mf.cc
   src/import_amf.cc
