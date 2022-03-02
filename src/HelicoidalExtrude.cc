@@ -85,10 +85,11 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 		// Classic Rotate_extrude ...
 		if ((node->angle <= -360) || (node->angle > 360))
 			node->angle = 360;
+		/*
 		if( (node->angle == 360) && (node->zRotate != 0)) {
 			// Limitation temporaire.
 			node->zRotate = (node->zRotate >= 180) ? 360 : 0;
-		}
+		} */
     }
 
     if(node->angle == 0)

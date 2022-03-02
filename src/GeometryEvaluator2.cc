@@ -70,6 +70,22 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
   }
 }
 
+// Specific closure when rotating
+static int AGZ_selectIndexMobius(std::vector<Vector3d> &list) {
+	int index = 0;
+	double d = 0;
+	for(int i=list.size()-1; i>=0;i--) {
+		Vector3d u = list[i];
+		double l = u[0]*u[0] + u[1]*u[1] + u[2] * u[2];
+		if(l > d)
+		{
+			index = i;
+			d = l;
+		}
+	}
+	return index;
+}
+
 // A.G. Helicoidal Extrude from Rotate Extrude !
 /*!
     Input to extrude should be clean. This means non-intersecting, correct winding order
@@ -91,6 +107,7 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 */
 static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Polygon2d &poly)
 {
+	bool bMobius = false;
     if (node.angle == 0) return nullptr;
 
     bool b360 = (node.angle == 360);
@@ -197,21 +214,24 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         delete ps_end;
     }
 
-	
+	if(b360 && (node.zRotate != 0))
+		bMobius = true;
+		
     for(const auto &o : poly.outlines()) {
         std::vector<Vector3d> rings[2];
         rings[0].resize(o.vertices.size());
         rings[1].resize(o.vertices.size());
 
         AGZ_fillRing(rings[0], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments); // first ring
-        for (unsigned int j = 0; j < fragments; j++) {
+        int nbFrag = bMobius ? fragments-1 : fragments;
+        for (unsigned int j = 0; j < nbFrag; j++) {
             double a;
             if (b360)
                 a = -90 + ((j+1)%fragments) * 360.0 / fragments; // start on the -X axis, for legacy support
             else
                 a = 90 - (j+1)* node.angle / fragments; // start on the X axis
                 
-            AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/fragments, 1+(j+1)*(node.yScalEnd-1)/fragments, node.xOffset, node.axeRotate, (j+1)*node.zRotate/fragments);
+            AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/nbFrag, 1+(j+1)*(node.yScalEnd-1)/nbFrag, node.xOffset, node.axeRotate, (j+1)*node.zRotate/fragments);
             for (size_t i=0;i<o.vertices.size();i++) {
                 ps->append_poly();
                 ps->insert_vertex(rings[j%2][i]);
@@ -223,8 +243,25 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
                 ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
             }
         }
-    }
+		if(bMobius) {
+			// Rejoindre les extremités
+			AGZ_fillRing(rings[0], o, ((b360) ? -90 : 90) + nbFrag * 360.0 / fragments, flip_faces, nbFrag*pas, nbFrag*xStep, node.xScalEnd, node.yScalEnd, node.xOffset, node.axeRotate, node.zRotate); // last ring
+			AGZ_fillRing(rings[1], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments); // first ring
+			int idx0 = AGZ_selectIndexMobius(rings[0]);
+			int idx1 = AGZ_selectIndexMobius(rings[1]);
+			for (size_t i=0;i<o.vertices.size();i++) {
+				ps->append_poly();
+				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
+				ps->insert_vertex(rings[0][(i+1+idx0)%o.vertices.size()]);
+				ps->append_poly();
+				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+idx1)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
+			}
+		}
 
+    }
     return ps;
 }
 
