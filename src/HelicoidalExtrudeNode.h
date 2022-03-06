@@ -20,6 +20,8 @@ public:
         xOffset = 0.0;
         axeRotate = 0;
         zRotate = 0.0;
+        xRotate = 0.0;
+        xOffsetEnd = 0.0;
 	}
 	std::string toString() const override;
 	std::string name() const override { return "helicoidal_extrude"; }
@@ -36,4 +38,6 @@ public:
 	double xOffset;
 	double axeRotate;
 	double zRotate;
+	double xRotate;
+	double xOffsetEnd;
 };

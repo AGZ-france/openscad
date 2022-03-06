@@ -51,7 +51,7 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 
         Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
                 {"layer", "origin", "scale"},
-                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zRotate" }
+                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zRotate", "xRotate" , "xOffsetEnd" }
         );
 
 	node->fn = parameters["$fn"].toDouble();
@@ -72,6 +72,9 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 
 	node->zRotate = 0;
 	parameters["zRotate"].getFiniteDouble(node->zRotate);
+	node->xRotate = 0;
+	parameters["xRotate"].getFiniteDouble(node->xRotate);
+	node->xRotate += 90;
 
 	node->step = 0;
 	parameters["step"].getFiniteDouble(node->step);
@@ -124,6 +127,8 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 
     node->xOffset = 0;
     parameters["xOffset"].getFiniteDouble(node->xOffset);
+    node->xOffsetEnd = node->xOffset;
+    parameters["xOffsetEnd"].getFiniteDouble(node->xOffsetEnd);
 
     node->axeRotate = 0;
     parameters["axeRotate"].getFiniteDouble(node->axeRotate);
@@ -144,8 +149,9 @@ std::string HelicoidalExtrudeNode::toString() const
 		"angle = " << this->angle << ", "
 		"convexity = " << this->convexity << ", "
         "$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ", step = " << this->step << ", delta = " << this->delta
-        << ", xScalEnd = " << this->xScalEnd << ", yScalEnd = " << this->yScalEnd << ", xOffset = " << this->xOffset <<", axeRotate = " << this->axeRotate
-        << ", zRotate = " << this->zRotate << ")";
+        << ", xScalEnd = " << this->xScalEnd << ", yScalEnd = " << this->yScalEnd << ", xOffset = " << this->xOffset << ", xOffsetEnd = " << this->xOffsetEnd
+        <<", axeRotate = " << this->axeRotate
+        << ", zRotate = " << this->zRotate << ", xRotate = " << this->xRotate<< ")";
 
 	return stream.str();
 }
@@ -154,6 +160,6 @@ void register_builtin_helicoidal_extrude()
 {
 	Builtins::init("helicoidal_extrude", new BuiltinModule(builtin_helicoidal_extrude),
 				{
-					"helicoidal_extrude(angle = 360, convexity = 2)",
+					"helicoidal_extrude(angle = 360, convexity = 2, ...)",
 				});
 }
