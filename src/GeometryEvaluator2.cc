@@ -185,8 +185,8 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
 
  	//step fait référence à un tour complet
 	double  ratio = (node.angle < 360) ? 360 / std::abs(node.angle) : 1.0;
-	int  frag360 =  (unsigned int)fmax(fragCircle * ratio, 1);
-    double pas = step  / frag360;
+	int  frag360 =  (unsigned int)fmax(fragCircle / ratio, 1);
+    double pas = step / frag360;
     
     Transform3d rotS(angle_axis_degrees(-node.axeRotate, Vector3d::UnitY()));
     if(!b360) {
