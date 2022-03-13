@@ -242,7 +242,7 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         rings[0].resize(o.vertices.size());
         rings[1].resize(o.vertices.size());
 
-        AGZ_fillRing(rings[0], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments, node.xRotate); // first ring
+        AGZ_fillRing(rings[0], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, 0, node.xRotate); // first ring
         int nbFrag = bMobius ? fragments-1 : fragments;
         double xOffsetStep = (node.xOffsetEnd - node.xOffset) / nbFrag;
         for (unsigned int j = 0; j < nbFrag; j++) {
