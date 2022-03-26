@@ -35,7 +35,7 @@
 
 
 // A.G. Scaling object added
-static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double a, bool flip, double step, double xStep=0, double xScale = 1, double yScale = 1, double xOffset = 0, double axeRotate=0, double zRotate = 0)
+static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double a, bool flip, double step, double xStep=0, double xScale = 1, double yScale = 1, double xOffset = 0, double axeRotate=0, double zRotate = 0, double xRotate = 90)
 {
   if (flip) {
     unsigned int l = o.vertices.size() - 1;
@@ -48,9 +48,18 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
 				}
 			    double X = x  * xScale;
-				ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X * sin_degrees(a+axeRotate);
-				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X * cos_degrees(a+axeRotate);
-	            ring[i][2] = (Y + step) * yScale ;
+				/*
+				 ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X * sin_degrees(a+axeRotate);
+				 ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X * cos_degrees(a+axeRotate);
+	             ring[i][2] = (Y + step) * yScale ;
+	            */
+	            double X2 = X ;
+	            double Y2 = Y * yScale * cos_degrees(xRotate);
+	            double Z2 = Y * sin_degrees(xRotate);
+	            
+	            ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X2 * sin_degrees(a+axeRotate) - Y2 * cos_degrees(a+axeRotate);
+				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X2 * cos_degrees(a+axeRotate) + Y2 * sin_degrees(a+axeRotate);
+	            ring[i][2] = (Z2 + step) * yScale  ;
     }
   } else {
     for (unsigned int i = 0; i < o.vertices.size(); ++i) {
@@ -62,12 +71,36 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
 				}
 			    double X = x  * xScale;
-
+				/*
 				ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X * sin_degrees(a+axeRotate);
 				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X * cos_degrees(a+axeRotate);
 	            ring[i][2] = (Y + step) * yScale;
+	            */
+	            double X2 = X ;
+	            double Y2 = Y * yScale * cos_degrees(xRotate);
+	            double Z2 = Y * sin_degrees(xRotate);
+	            
+	            ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X2 * sin_degrees(a+axeRotate) - Y2 * cos_degrees(a+axeRotate);
+				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X2 * cos_degrees(a+axeRotate) + Y2 * sin_degrees(a+axeRotate);
+	            ring[i][2] = (Z2 + step) * yScale  ;
     }
   }
+}
+
+// Specific closure when rotating
+static int AGZ_selectIndexMobius(std::vector<Vector3d> &list) {
+	int index = 0;
+	double d = 0;
+	for(int i=list.size()-1; i>=0;i--) {
+		Vector3d u = list[i];
+		double l = u[0]*u[0] + u[1]*u[1] + u[2] * u[2];
+		if(l > d)
+		{
+			index = i;
+			d = l;
+		}
+	}
+	return index;
 }
 
 // A.G. Helicoidal Extrude from Rotate Extrude !
@@ -91,6 +124,7 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 */
 static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Polygon2d &poly)
 {
+	bool bMobius = false;
     if (node.angle == 0) return nullptr;
 
     bool b360 = (node.angle == 360);
@@ -151,8 +185,8 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
 
  	//step fait référence à un tour complet
 	double  ratio = (node.angle < 360) ? 360 / std::abs(node.angle) : 1.0;
-	int  frag360 =  (unsigned int)fmax(fragCircle * ratio, 1);
-    double pas = step  / frag360;
+	int  frag360 =  (unsigned int)fmax(fragCircle / ratio, 1);
+    double pas = step / frag360;
     
     Transform3d rotS(angle_axis_degrees(-node.axeRotate, Vector3d::UnitY()));
     if(!b360) {
@@ -160,7 +194,7 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         ps_start->transform(rotS);
         PolysetUtils::translate(*ps_start, Vector3d(node.xOffset,0,0));
         
-        Transform3d rot(angle_axis_degrees(90, Vector3d::UnitX()));
+        Transform3d rot(angle_axis_degrees(node.xRotate, Vector3d::UnitX()));
         ps_start->transform(rot);
         // Flip vertex ordering
         if (!flip_faces) {
@@ -183,10 +217,13 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
                
         PolysetUtils::scale(*ps_end, Vector3d(node.xScalEnd, node.yScalEnd, 1));
         ps_end->transform(rotS2);
-        PolysetUtils::translate(*ps_end, Vector3d(xStep*fragments*node.xScalEnd, pas*fragments*node.yScalEnd, 0));
-        
-        PolysetUtils::translate(*ps_end, Vector3d(node.xOffset,0,0));
-        Transform3d rot2(angle_axis_degrees(node.angle, Vector3d::UnitZ()) * angle_axis_degrees(90, Vector3d::UnitX()));
+        PolysetUtils::translate(*ps_end, Vector3d(xStep*fragments*node.xScalEnd, 0, 0));
+        Transform3d rotX(angle_axis_degrees(node.xRotate, Vector3d::UnitX()));
+        ps_end->transform(rotX);
+        PolysetUtils::translate(*ps_end, Vector3d(0, 0, pas*fragments*node.yScalEnd));
+       
+        PolysetUtils::translate(*ps_end, Vector3d(node.xOffsetEnd,0,0));
+        Transform3d rot2(angle_axis_degrees(node.angle, Vector3d::UnitZ()) );
         ps_end->transform(rot2);
         if (flip_faces) {
             for(auto &p : ps_end->polygons) {
@@ -197,21 +234,25 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         delete ps_end;
     }
 
-	
+	if(b360 && (node.zRotate != 0))
+		bMobius = true;
+		
     for(const auto &o : poly.outlines()) {
         std::vector<Vector3d> rings[2];
         rings[0].resize(o.vertices.size());
         rings[1].resize(o.vertices.size());
 
-        AGZ_fillRing(rings[0], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments); // first ring
-        for (unsigned int j = 0; j < fragments; j++) {
+        AGZ_fillRing(rings[0], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, 0, node.xRotate); // first ring
+        int nbFrag = bMobius ? fragments-1 : fragments;
+        double xOffsetStep = (node.xOffsetEnd - node.xOffset) / nbFrag;
+        for (unsigned int j = 0; j < nbFrag; j++) {
             double a;
             if (b360)
                 a = -90 + ((j+1)%fragments) * 360.0 / fragments; // start on the -X axis, for legacy support
             else
                 a = 90 - (j+1)* node.angle / fragments; // start on the X axis
                 
-            AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/fragments, 1+(j+1)*(node.yScalEnd-1)/fragments, node.xOffset, node.axeRotate, (j+1)*node.zRotate/fragments);
+            AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/nbFrag, 1+(j+1)*(node.yScalEnd-1)/nbFrag, node.xOffset+(j+1)*xOffsetStep, node.axeRotate, (j+1)*node.zRotate/fragments, node.xRotate);
             for (size_t i=0;i<o.vertices.size();i++) {
                 ps->append_poly();
                 ps->insert_vertex(rings[j%2][i]);
@@ -223,8 +264,25 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
                 ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
             }
         }
-    }
+		if(bMobius) {
+			// Rejoindre les extremités
+			AGZ_fillRing(rings[0], o, ((b360) ? -90 : 90) + nbFrag * 360.0 / fragments, flip_faces, nbFrag*pas, nbFrag*xStep, node.xScalEnd, node.yScalEnd, node.xOffsetEnd, node.axeRotate, node.zRotate, node.xRotate); // last ring
+			AGZ_fillRing(rings[1], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments, node.xRotate); // first ring
+			int idx0 = AGZ_selectIndexMobius(rings[0]);
+			int idx1 = AGZ_selectIndexMobius(rings[1]);
+			for (size_t i=0;i<o.vertices.size();i++) {
+				ps->append_poly();
+				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
+				ps->insert_vertex(rings[0][(i+1+idx0)%o.vertices.size()]);
+				ps->append_poly();
+				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+idx1)%o.vertices.size()]);
+				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
+			}
+		}
 
+    }
     return ps;
 }
 

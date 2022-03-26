@@ -15,6 +15,6 @@
    
    // Spirale dans un plan avec step=0 ...
    translate([0,500,0])
-   helicoidal_extrude(angle =3600, convexity = 2, $fs=20, delta=20, $fn=200, xOffset=40, xScalEnd = 4) {
+   helicoidal_extrude(angle =3600, convexity = 2, $fs=20, delta=40, $fn=200, xOffset=40, xScalEnd = 4) {
           rotate([0,0,45])square([4,4], center = true);
    }
