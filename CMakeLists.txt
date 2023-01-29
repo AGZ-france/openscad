@@ -620,6 +620,8 @@ set(CORE_SOURCES
   src/core/Tree.cc
   src/core/customizer/ParameterObject.cc
   src/core/customizer/ParameterSet.cc
+  src/core/HelicoidalExtrude.cc
+  src/core/HelicoidalExtrudeNode.h
   src/ext/lodepng/lodepng.cpp
   src/ext/polyclipping/clipper.cpp
   src/ext/libtess2/Source/bucketalloc.c
@@ -697,6 +699,7 @@ set(CORE_SOURCES
   ${BISON_comment_parser_OUTPUTS})
 
 set(CGAL_SOURCES
+  src/geometry/GeometryEvaluator2.cc
   src/geometry/GeometryEvaluator.cc
   src/geometry/cgal/cgalutils.cc
   src/geometry/cgal/cgalutils-applyops.cc
