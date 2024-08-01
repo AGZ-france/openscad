@@ -18,6 +18,7 @@
 #include "ClipperUtils.h"
 #include "PolySetUtils.h"
 #include "PolySet.h"
+#include "PolySetBuilder.h"
 #include "calc.h"
 #include "printutils.h"
 #include "svg.h"
@@ -27,10 +28,10 @@
 #include <ciso646> // C alternative tokens (xor)
 #include <algorithm>
 #include "boost-utils.h"
-
+#ifdef ENABLE_CGAL
 #include <CGAL/convex_hull_2.h>
 #include <CGAL/Point_2.h>
-
+#endif
 
 
 // A.G. Scaling object added
@@ -121,17 +122,20 @@ static int AGZ_selectIndexMobius(std::vector<Vector3d> &list) {
     Currently, we generate a lot of zero-area triangles
 
 */
-static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Polygon2d &poly)
+static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &node, const Polygon2d &poly)
 {
 	bool bMobius = false;
     if (node.angle == 0) return nullptr;
 
+    PolySetBuilder builder;
+    builder.setConvexity(node.convexity);
+    
     bool b360 = (node.angle == 360);
     if(node.delta > 0) b360 = false;
     if(node.step != 0) b360 = false;
 
-    PolySet *ps = new PolySet(3);
-    ps->setConvexity(node.convexity);
+//    PolySet *ps = new PolySet(3);
+//    ps->setConvexity(node.convexity);
 
     double min_x = 0;
     double max_x = 0;
@@ -148,7 +152,7 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
 
             if ((max_x - min_x) > (max_x+node.xOffset) && (max_x - min_x) > fabs(min_x+node.xOffset)) {
 			    LOG(message_group::Error,Location::NONE,"", "all points for helicoidal_extrude() must have the same X coordinate sign (range is %1$.2f -> %2$.2f)", min_x , max_x);
-                delete ps;
+//                delete ps;
                 return nullptr;
             }
         }
@@ -189,7 +193,7 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
     
     Transform3d rotS(angle_axis_degrees(-node.axeRotate, Vector3d::UnitY()));
     if(!b360) {
-        PolySet *ps_start = poly.tessellate(); // starting face
+        auto ps_start = poly.tessellate(); // starting face
         ps_start->transform(rotS);
         PolySetUtils::translate(*ps_start, Vector3d(node.xOffset,0,0));
         
@@ -197,19 +201,21 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         ps_start->transform(rot);
         // Flip vertex ordering
         if (!flip_faces) {
-            for(auto &p : ps_start->polygons) {
+            for(auto &p : ps_start->indices) {
                 std::reverse(p.begin(), p.end());
             }
         }
-        ps->append(*ps_start);
-        delete ps_start;
+        //ps->append(*ps_start);
+        //delete ps_start;
+		builder.appendPolySet(*ps_start);
 
-        PolySet *ps_end = poly.tessellate();
+        auto ps_end = poly.tessellate();
         
         if(node.zRotate != 0) {
-			Polygon2d *poly2 = (Polygon2d *)poly.copy();
-            poly2->transform(mat2);
-            ps_end = poly2->tessellate();
+			std::unique_ptr<Geometry> geometry = poly.copy();
+			Polygon2d& polygon =  dynamic_cast<Polygon2d &>(*geometry);
+            polygon.transform(mat2);
+            ps_end = polygon.tessellate();
 		}
             
         Transform3d rotS2(angle_axis_degrees(-node.axeRotate, Vector3d::UnitY()));
@@ -225,12 +231,13 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
         Transform3d rot2(angle_axis_degrees(node.angle, Vector3d::UnitZ()) );
         ps_end->transform(rot2);
         if (flip_faces) {
-            for(auto &p : ps_end->polygons) {
+            for(auto &p : ps_end->indices) {
                 std::reverse(p.begin(), p.end());
             }
         }
-        ps->append(*ps_end);
-        delete ps_end;
+        //ps->append(*ps_end);
+        //delete ps_end;
+		builder.appendPolySet(*ps_end);
     }
 
 	if(b360 && (node.zRotate != 0))
@@ -253,14 +260,18 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
                 
             AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/nbFrag, 1+(j+1)*(node.yScalEnd-1)/nbFrag, node.xOffset+(j+1)*xOffsetStep, node.axeRotate, (j+1)*node.zRotate/fragments, node.xRotate);
             for (size_t i=0;i<o.vertices.size();i++) {
-                ps->append_poly();
-                ps->insert_vertex(rings[j%2][i]);
-                ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
-                ps->insert_vertex(rings[j%2][(i+1)%o.vertices.size()]);
-                ps->append_poly();
-                ps->insert_vertex(rings[j%2][i]);
-                ps->insert_vertex(rings[(j+1)%2][i]);
-                ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
+                //ps->append_poly();
+                //ps->insert_vertex(rings[j%2][i]);
+                //ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
+                //ps->insert_vertex(rings[j%2][(i+1)%o.vertices.size()]);
+				builder.appendPolygon({
+                	rings[j%2][i],
+                	rings[(j+1)%2][(i+1)%o.vertices.size()],
+                	rings[j%2][(i+1)%o.vertices.size()]});
+				builder.appendPolygon({
+                	rings[j%2][i],
+                	rings[(j+1)%2][i],
+                	rings[(j+1)%2][(i+1)%o.vertices.size()]});
             }
         }
 		if(bMobius) {
@@ -270,19 +281,19 @@ static Geometry *helicoidalPolygon(const HelicoidalExtrudeNode &node, const Poly
 			int idx0 = AGZ_selectIndexMobius(rings[0]);
 			int idx1 = AGZ_selectIndexMobius(rings[1]);
 			for (size_t i=0;i<o.vertices.size();i++) {
-				ps->append_poly();
-				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
-				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
-				ps->insert_vertex(rings[0][(i+1+idx0)%o.vertices.size()]);
-				ps->append_poly();
-				ps->insert_vertex(rings[0][(i+idx0)%o.vertices.size()]);
-				ps->insert_vertex(rings[1][(i+idx1)%o.vertices.size()]);
-				ps->insert_vertex(rings[1][(i+1+idx1)%o.vertices.size()]);
+				builder.appendPolygon({
+					rings[0][(i+idx0)%o.vertices.size()],
+					rings[1][(i+1+idx1)%o.vertices.size()],
+					rings[0][(i+1+idx0)%o.vertices.size()]});
+				builder.appendPolygon({
+					rings[0][(i+idx0)%o.vertices.size()],
+					rings[1][(i+idx1)%o.vertices.size()],
+					rings[1][(i+1+idx1)%o.vertices.size()]});
 			}
 		}
 
     }
-    return ps;
+    return builder.build();
 }
 
 /*!
@@ -296,16 +307,17 @@ Response GeometryEvaluator::visit(State &state, const HelicoidalExtrudeNode &nod
 {
     if (state.isPrefix() && isSmartCached(node)) return Response::PruneTraversal;
     if (state.isPostfix()) {
-        shared_ptr<const Geometry> geom;
+        std::shared_ptr<const Geometry> geom;
         if (!isSmartCached(node)) {
-            const Geometry *geometry = nullptr;
+			std::shared_ptr<const Polygon2d> geometry;
+            //const Geometry *geometry = nullptr;
             geometry = applyToChildren2D(node, OpenSCADOperator::UNION);
 
             if (geometry) {
-                const Polygon2d *polygons = dynamic_cast<const Polygon2d*>(geometry);
-                Geometry *rotated = helicoidalPolygon(node, *polygons);
-                geom.reset(rotated);
-                delete geometry;
+                //const Polygon2d *polygons = dynamic_cast<const Polygon2d*>(geometry);
+                geom = helicoidalPolygon(node, *geometry);
+                //geom.reset(rotated);
+                //delete geometry;
             }
         }
         else {
