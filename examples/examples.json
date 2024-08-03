@@ -33,6 +33,14 @@
     "sign.scad",
     "candleStand.scad"
   ],
+  "HelicoidalExtrude": [
+    "HeliceDeveloppable.scad",
+    "Torsion.scad",
+    "Screw.scad",
+    "Screw2.scad",
+    "ScrewX.scad",
+    "StrangesForm.scad"
+  ],
   "Old": [
     "example001.scad",
     "example002.scad",

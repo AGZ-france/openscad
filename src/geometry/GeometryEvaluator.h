@@ -30,6 +30,7 @@ public:
   Response visit(State& state, const AbstractPolyNode& node) override;
   Response visit(State& state, const LinearExtrudeNode& node) override;
   Response visit(State& state, const RotateExtrudeNode& node) override;
+   Response visit(State &state, const HelicoidalExtrudeNode &node) override;
 #if defined(ENABLE_EXPERIMENTAL) && defined(ENABLE_CGAL)
   Response visit(State& state, const RoofNode& node) override;
 #endif

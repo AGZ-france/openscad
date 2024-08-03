@@ -56,6 +56,7 @@ extern void register_builtin_cgaladv();
 extern void register_builtin_offset();
 extern void register_builtin_dxf_linear_extrude();
 extern void register_builtin_dxf_rotate_extrude();
+extern void register_builtin_helicoidal_extrude();
 #if defined(ENABLE_EXPERIMENTAL) && defined(ENABLE_CGAL)
 extern void register_builtin_roof();
 #endif
@@ -87,6 +88,7 @@ void Builtins::initialize()
   register_builtin_offset();
   register_builtin_dxf_linear_extrude();
   register_builtin_dxf_rotate_extrude();
+    register_builtin_helicoidal_extrude();
 #if defined(ENABLE_EXPERIMENTAL) && defined(ENABLE_CGAL)
   register_builtin_roof();
 #endif
