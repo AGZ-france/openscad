@@ -39,6 +39,7 @@
     "Screw.scad",
     "Screw2.scad",
     "ScrewX.scad",
+    "mobius.scad",
     "StrangesForm.scad"
   ],
   "Old": [

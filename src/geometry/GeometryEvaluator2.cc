@@ -48,11 +48,6 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
 				}
 			    double X = x  * xScale;
-				/*
-				 ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X * sin_degrees(a+axeRotate);
-				 ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X * cos_degrees(a+axeRotate);
-	             ring[i][2] = (Y + step) * yScale ;
-	            */
 	            double X2 = X ;
 	            double Y2 = Y * yScale * cos_degrees(xRotate);
 	            double Z2 = Y * sin_degrees(xRotate);
@@ -71,11 +66,7 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
 					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
 				}
 			    double X = x  * xScale;
-				/*
-				ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X * sin_degrees(a+axeRotate);
-				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X * cos_degrees(a+axeRotate);
-	            ring[i][2] = (Y + step) * yScale;
-	            */
+
 	            double X2 = X ;
 	            double Y2 = Y * yScale * cos_degrees(xRotate);
 	            double Z2 = Y * sin_degrees(xRotate);
@@ -205,12 +196,10 @@ static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &
                 std::reverse(p.begin(), p.end());
             }
         }
-        //ps->append(*ps_start);
-        //delete ps_start;
 		builder.appendPolySet(*ps_start);
 
         auto ps_end = poly.tessellate();
-        
+       
         if(node.zRotate != 0) {
 			std::unique_ptr<Geometry> geometry = poly.copy();
 			Polygon2d& polygon =  dynamic_cast<Polygon2d &>(*geometry);
@@ -235,8 +224,6 @@ static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &
                 std::reverse(p.begin(), p.end());
             }
         }
-        //ps->append(*ps_end);
-        //delete ps_end;
 		builder.appendPolySet(*ps_end);
     }
 
@@ -260,35 +247,36 @@ static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &
                 
             AGZ_fillRing(rings[(j+1)%2], o, a, flip_faces, (j+1)*pas, (j+1)*xStep, 1+(j+1)*(node.xScalEnd-1)/nbFrag, 1+(j+1)*(node.yScalEnd-1)/nbFrag, node.xOffset+(j+1)*xOffsetStep, node.axeRotate, (j+1)*node.zRotate/fragments, node.xRotate);
             for (size_t i=0;i<o.vertices.size();i++) {
-                //ps->append_poly();
-                //ps->insert_vertex(rings[j%2][i]);
-                //ps->insert_vertex(rings[(j+1)%2][(i+1)%o.vertices.size()]);
-                //ps->insert_vertex(rings[j%2][(i+1)%o.vertices.size()]);
 				builder.appendPolygon({
-                	rings[j%2][i],
+                	rings[j%2][(i+1)%o.vertices.size()],
                 	rings[(j+1)%2][(i+1)%o.vertices.size()],
-                	rings[j%2][(i+1)%o.vertices.size()]});
+                	rings[j%2][i]
+                });
 				builder.appendPolygon({
-                	rings[j%2][i],
+                	rings[(j+1)%2][(i+1)%o.vertices.size()],
                 	rings[(j+1)%2][i],
-                	rings[(j+1)%2][(i+1)%o.vertices.size()]});
+                	rings[j%2][i],
+                });
             }
         }
 		if(bMobius) {
 			// Rejoindre les extremités
-			AGZ_fillRing(rings[0], o, ((b360) ? -90 : 90) + nbFrag * 360.0 / fragments, flip_faces, nbFrag*pas, nbFrag*xStep, node.xScalEnd, node.yScalEnd, node.xOffsetEnd, node.axeRotate, node.zRotate, node.xRotate); // last ring
-			AGZ_fillRing(rings[1], o, (b360) ? -90 : 90, flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, node.zRotate/fragments, node.xRotate); // first ring
+			if(nbFrag%2 == 1)
+				rings[0] = rings[1];
+			AGZ_fillRing(rings[1], o, -90 , flip_faces, 0, 0, 1,1, node.xOffset, node.axeRotate, 0, node.xRotate); // first ring
 			int idx0 = AGZ_selectIndexMobius(rings[0]);
 			int idx1 = AGZ_selectIndexMobius(rings[1]);
 			for (size_t i=0;i<o.vertices.size();i++) {
 				builder.appendPolygon({
-					rings[0][(i+idx0)%o.vertices.size()],
+					rings[0][(i+1+idx0)%o.vertices.size()],
 					rings[1][(i+1+idx1)%o.vertices.size()],
-					rings[0][(i+1+idx0)%o.vertices.size()]});
+					rings[0][(i+idx0)%o.vertices.size()]
+				});
 				builder.appendPolygon({
-					rings[0][(i+idx0)%o.vertices.size()],
+					rings[1][(i+1+idx1)%o.vertices.size()],
 					rings[1][(i+idx1)%o.vertices.size()],
-					rings[1][(i+1+idx1)%o.vertices.size()]});
+					rings[0][(i+idx0)%o.vertices.size()]
+				});
 			}
 		}
 
@@ -321,7 +309,7 @@ Response GeometryEvaluator::visit(State &state, const HelicoidalExtrudeNode &nod
             }
         }
         else {
-            geom = smartCacheGet(node, false);
+            geom = smartCacheGet(node, state.preferNef());
         }
         addToParent(state, node, geom);
         node.progress_report();

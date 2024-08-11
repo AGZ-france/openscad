@@ -3,7 +3,7 @@
  */
  
 module vis(hauteur, pas, diam) { 
-    diam2 = pas/sin(60);
+    diam2 = pas*0.99/sin(60);
     union() {
         cylinder(d=diam, h=hauteur, $fn=100);
         helicoidal_extrude(angle =360*(hauteur-pas)/pas, convexity = 2, $fs=20, step=pas, $fn=100, xOffset=diam/2+diam2*cos(60)/2) {
@@ -14,7 +14,7 @@ module vis(hauteur, pas, diam) {
 }
 
 module ecrou(hauteur, pas, diam) { 
-    diam2 = pas/sin(60);
+    diam2 = pas*0.99/sin(60);
     union() {
 
         difference() {
