@@ -40,7 +40,7 @@
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 #include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
+//namespace fs = boost::filesystem;
 /*
  * Distinction xScale pour un tour (360 °) du xScale de la form en fin de rotation (xScalEnd).
  * idem pour yScale
