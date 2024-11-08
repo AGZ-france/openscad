@@ -15,7 +15,7 @@ public:
 		step = 0;
         delta = 0;
         scale = 1.0;
-        xScalEnd =yScalEnd = 1;
+        xScalEnd =yScalEnd = zScalEnd = 1;
 		nbRotation = 1;
         xOffset = 0.0;
         axeRotate = 0;
@@ -31,7 +31,7 @@ public:
 	double origin_x, origin_y, scale, angle;
     double step;
     double delta;
-    double xScalEnd, yScalEnd;
+    double xScalEnd, yScalEnd, zScalEnd;
     double nbRotation;
 	std::string layername;
 	

@@ -51,7 +51,7 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 
         Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
                 {"layer", "origin", "scale"},
-                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zRotate", "xRotate" , "xOffsetEnd" }
+                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zScalEnd", "zRotate", "xRotate" , "xOffsetEnd" }
         );
 
 	node->fn = parameters["$fn"].toDouble();
@@ -103,8 +103,11 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
     parameters["xScalEnd"].getFiniteDouble(node->xScalEnd);
     node->yScalEnd = 1;
     parameters["yScalEnd"].getFiniteDouble(node->yScalEnd);
+    node->zScalEnd = 1;
+    parameters["zScalEnd"].getFiniteDouble(node->zScalEnd);
     if(node->xScalEnd <=0) node->xScalEnd = 1;
     if(node->yScalEnd <=0) node->yScalEnd = 1;
+    if(node->zScalEnd <=0) node->zScalEnd = 1;
 
 	double xScale, yScale;
 	if(parameters["xScale"].getFiniteDouble(xScale)) {
@@ -149,7 +152,8 @@ std::string HelicoidalExtrudeNode::toString() const
 		"angle = " << this->angle << ", "
 		"convexity = " << this->convexity << ", "
         "$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ", step = " << this->step << ", delta = " << this->delta
-        << ", xScalEnd = " << this->xScalEnd << ", yScalEnd = " << this->yScalEnd << ", xOffset = " << this->xOffset << ", xOffsetEnd = " << this->xOffsetEnd
+        << ", xScalEnd = " << this->xScalEnd << ", yScalEnd = " << this->yScalEnd << ", zScalEnd = " << this->zScalEnd
+	<< ", xOffset = " << this->xOffset << ", xOffsetEnd = " << this->xOffsetEnd
         <<", axeRotate = " << this->axeRotate
         << ", zRotate = " << this->zRotate << ", xRotate = " << this->xRotate<< ")";
 
