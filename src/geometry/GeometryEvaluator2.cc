@@ -40,40 +40,40 @@ static void AGZ_fillRing(std::vector<Vector3d> &ring, const Outline2d &o, double
   if (flip) {
     unsigned int l = o.vertices.size() - 1;
     for (unsigned int i = 0; i < o.vertices.size(); ++i) {
-				double x = o.vertices[l-i][0];
-				double y = o.vertices[l-i][1];
-			    double Y = y;
-				if(zRotate != 0) {
-					Y = x * sin_degrees(zRotate) + y * cos_degrees(zRotate);
-					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
-				}
-			    double X = x  * xScale;
-	            double X2 = X ;
-	            double Y2 = Y * yScale * cos_degrees(xRotate);
-	            double Z2 = Y * sin_degrees(xRotate);
+	double x = o.vertices[l-i][0];
+	double y = o.vertices[l-i][1];
+	double Y = y;
+	if(zRotate != 0) {
+		Y = x * sin_degrees(zRotate) + y * cos_degrees(zRotate);
+		x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
+	}
+	double X = x  * xScale;
+	double X2 = X ;
+	double Y2 = Y * yScale * cos_degrees(xRotate);
+	double Z2 = Y * yScale * sin_degrees(xRotate);
 	            
-	            ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X2 * sin_degrees(a+axeRotate) - Y2 * cos_degrees(a+axeRotate);
+	ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X2 * sin_degrees(a+axeRotate) - Y2 * cos_degrees(a+axeRotate);
 				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X2 * cos_degrees(a+axeRotate) + Y2 * sin_degrees(a+axeRotate);
-	            ring[i][2] = (Z2 + step) * zScale  ;
+	ring[i][2] = Z2 + step * zScale  ;
     }
   } else {
     for (unsigned int i = 0; i < o.vertices.size(); ++i) {
-				double x = o.vertices[i][0];
-				double y = o.vertices[i][1];
-			    double Y = y;
-				if(zRotate != 0) {
-					Y = x * sin_degrees(zRotate) + y * cos_degrees(zRotate);
-					x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
-				}
-			    double X = x  * xScale;
+	double x = o.vertices[i][0];
+	double y = o.vertices[i][1];
+	double Y = y;
+	if(zRotate != 0) {
+		Y = x * sin_degrees(zRotate) + y * cos_degrees(zRotate);
+		x = x * cos_degrees(zRotate) - y * sin_degrees(zRotate);
+	}
+	double X = x  * xScale;
 
-	            double X2 = X ;
-	            double Y2 = Y * yScale * cos_degrees(xRotate);
-	            double Z2 = Y * sin_degrees(xRotate);
+	double X2 = X ;
+	double Y2 = Y * yScale * cos_degrees(xRotate);
+	double Z2 = Y * yScale * sin_degrees(xRotate);
 	            
-	            ring[i][0] = (xOffset+xStep* xScale) * sin_degrees(a) + X2 * sin_degrees(a+axeRotate) - Y2 * cos_degrees(a+axeRotate);
-				ring[i][1] = (xOffset+xStep* xScale) * cos_degrees(a) + X2 * cos_degrees(a+axeRotate) + Y2 * sin_degrees(a+axeRotate);
-	            ring[i][2] = (Z2 + step) * zScale  ;
+	ring[i][0] = (xOffset+xStep*xScale)*sin_degrees(a) + X2*sin_degrees(a+axeRotate) - Y2*cos_degrees(a+axeRotate);
+				ring[i][1] = (xOffset+xStep*xScale)*cos_degrees(a) + X2*cos_degrees(a+axeRotate) + Y2*sin_degrees(a+axeRotate);
+	ring[i][2] = Z2 + step * zScale  ;
     }
   }
 }
