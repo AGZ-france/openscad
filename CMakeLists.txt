@@ -31,12 +31,16 @@ include("cmake/Modules/openscad_version.cmake")
 option(INFO "Display build configuration info at end of cmake config" ON)
 option(ENABLE_TESTS "Run testsuite after building." ON)
 option(EXPERIMENTAL "Enable Experimental Features" OFF)
-option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" OFF)
+option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" ON)
 option(USE_BUILTIN_MANIFOLD "Use manifold from submodule" ON)
 option(USE_LEGACY_RENDERERS "Use legacy (non-VBO) OpenGL renderers" OFF)
 option(SNAPSHOT "Create dev snapshot, uses nightly icons" OFF)
 option(HEADLESS "Build without GUI frontend" OFF)
+if(APPLE)
+  option(USE_QT6 "Build the GUI with Qt6" ON)
+else()
 option(USE_QT6 "Build the GUI with Qt6" OFF)
+endif()
 option(ENABLE_EGL "Enable EGL support if available" ON)
 option(ENABLE_GLX "Enable GLX support if available" ON)
 # For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
@@ -53,7 +57,6 @@ option(USE_CCACHE "Use ccache to speed up compilation." ON)
 option(ENABLE_CAIRO "Enable support for cairo vector graphics library." ON)
 option(ENABLE_SPNAV "Enable support for libspnav input driver." ON)
 option(ENABLE_HIDAPI "Enable support for HIDAPI input driver." ON)
-option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ENABLE_CGAL "Enable CGAL." ON)
 option(ENABLE_MANIFOLD "Enable Manifold." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
@@ -64,8 +67,13 @@ cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instea
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt." ON "NOT HEADLESS" OFF)
 cmake_dependent_option(ENABLE_GAMEPAD "Enable Qt5Gamepad input driver." ON "NOT HEADLESS;NOT USE_QT6" OFF)
 
-# Minimum version required for std::filesystem
-set(DEPLOYMENT_TARGET "10.15")
+if (USE_QT6)
+  # Minimum version required for Qt-6.5
+  set(DEPLOYMENT_TARGET "11.0")
+else()
+  # Minimum version required for std::filesystem
+  set(DEPLOYMENT_TARGET "10.15")
+endif()
 
 # Note: CMAKE_OSX_DEPLOYMENT_TARGET must be set before the project() invocation
 set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET} CACHE STRING "Minimum OS X deployment version")
@@ -134,7 +142,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
   set(Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
   set(Boost_USE_STATIC_RUNTIME ON CACHE BOOL "" FORCE)
   set(ENABLE_CAIRO OFF CACHE BOOL "" FORCE)
-  set(ENABLE_TBB OFF CACHE BOOL "" FORCE)
+  set(MANIFOLD_PAR OFF CACHE STRING "" FORCE)
   set(NULLGL ON CACHE BOOL "" FORCE)
   set(USE_MIMALLOC OFF CACHE BOOL "" FORCE)
   set(ENV{PKG_CONFIG_PATH} "/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig")
@@ -285,10 +293,11 @@ if (MSVC)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
   set(Boost_USE_STATIC_LIBS TRUE)
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(harfbuzz CONFIG REQUIRED)
   find_path(HARFBUZZ_INCLUDE_DIRS harfbuzz)
@@ -332,10 +341,11 @@ else()
   target_compile_definitions(OpenSCAD PRIVATE EIGEN_DONT_ALIGN)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(HarfBuzz 0.9.19 REQUIRED QUIET)
   message(STATUS "Harfbuzz: ${HARFBUZZ_VERSION}")
@@ -922,38 +932,31 @@ set(MANIFOLD_CGAL_SOURCES
   src/geometry/manifold/manifold-applyops-minkowski.cc
 )
 
-if(EXPERIMENTAL AND ENABLE_TBB)
-  # Note: currently only Manifold-related code makes use of TBB parallelization
-  # ("exact" CGAL numerics are not thread-safe)
-  target_compile_options(OpenSCAD PRIVATE
-    -DENABLE_TBB
-  )
-  find_package(TBB QUIET)
-  if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(TBB tbb REQUIRED)
-    add_library(TBB::tbb UNKNOWN IMPORTED)
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
-    list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
-    set_target_properties(TBB::tbb
-      PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
-  endif()
-  message(STATUS "TBB: ${TBB_VERSION}")
-  target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
-endif()
-
 if(ENABLE_MANIFOLD)
+  if(NOT DEFINED MANIFOLD_PAR)
+    # Note: currently only Manifold-related code makes use of TBB parallelization
+    # ("exact" CGAL numerics are not thread-safe)
+    target_compile_options(OpenSCAD PRIVATE
+      -DENABLE_TBB
+    )
+    find_package(TBB QUIET)
+    if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
+      pkg_check_modules(TBB tbb REQUIRED)
+      add_library(TBB::tbb UNKNOWN IMPORTED)
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
+      list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
+      set_target_properties(TBB::tbb
+        PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
+    endif()
+    message(STATUS "TBB: ${TBB_VERSION}")
+    target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
 
-  # Hack to find our wanted version of Python before Manifold's included googletest finds Python2
-  find_package(Python3 3.4 COMPONENTS Interpreter REQUIRED)
-
-  if(NOT DEFINED MANIFOLD_PAR AND ENABLE_TBB)
-    set(MANIFOLD_PAR TBB CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"" FORCE)
+    set(MANIFOLD_PAR ON CACHE STRING "Parallel backend" FORCE)
   endif()
 
-  set(PYBIND11_FINDPYTHON OFF)
   set(MANIFOLD_PYBIND OFF)
   set(MANIFOLD_TEST OFF)
   if(USE_BUILTIN_MANIFOLD)
@@ -964,10 +967,12 @@ if(ENABLE_MANIFOLD)
     else()
       add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
     endif()
+    message(STATUS "mainfold submodule: ${manifold_VERSION}")
   else()
-    find_package(manifold REQUIRED)
+    find_package(manifold REQUIRED QUIET)
+    message(STATUS "mainfold: ${manifold_VERSION}")
   endif()
-  target_link_libraries(OpenSCAD PRIVATE manifold polygon cross_section)
+  target_link_libraries(OpenSCAD PRIVATE manifold::manifold)
   add_sanitizers(manifold)
 
   if (USE_MANIFOLD_TRIANGULATOR)
@@ -1057,6 +1062,7 @@ set(GUI_SOURCES
   src/gui/Preferences.cc
   src/gui/PrintInitDialog.cc
   src/gui/PrintService.cc
+  src/gui/ExternalToolInterface.cc
   src/gui/ProgressWidget.cc
   src/gui/QGLView.cc
   src/gui/QGLView2.cc
