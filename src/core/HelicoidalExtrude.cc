@@ -51,7 +51,8 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 
         Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
                 {"layer", "origin", "scale"},
-                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zScalEnd", "zRotate", "xRotate" , "xOffsetEnd" }
+                {"convexity", "angle", "step", "delta", "xScale", "yScale", "xOffset", "axeRotate", "xScalEnd", "yScalEnd", "zScalEnd", "zRotate", "xRotate" , "xOffsetEnd" ,
+				 "scaleBegin", "scaleEnd", "scaleMatrix" }
         );
 
 	node->fn = parameters["$fn"].toDouble();
@@ -100,15 +101,35 @@ static std::shared_ptr<AbstractNode> builtin_helicoidal_extrude(const ModuleInst
 	node->nbRotation = fabs(node->angle / 360);
     
     node->xScalEnd = 1;
-    parameters["xScalEnd"].getFiniteDouble(node->xScalEnd);
     node->yScalEnd = 1;
+    parameters["xScalEnd"].getFiniteDouble(node->xScalEnd);
     parameters["yScalEnd"].getFiniteDouble(node->yScalEnd);
     node->zScalEnd = 1;
     parameters["zScalEnd"].getFiniteDouble(node->zScalEnd);
     if(node->xScalEnd <=0) node->xScalEnd = 1;
     if(node->yScalEnd <=0) node->yScalEnd = 1;
     if(node->zScalEnd <=0) node->zScalEnd = 1;
-
+    
+    node->xScalBegin= node->yScalBegin = 1;
+	if(parameters["scaleBegin"].type() != Value::Type::VECTOR) {
+		parameters["scaleBegin"].getFiniteDouble(node->xScalBegin);
+		node->yScalBegin = node->xScalBegin;
+	} else {
+		parameters["scaleBegin"].getVec2(node->xScalBegin, node->yScalBegin);
+ 	}	
+ 	if(parameters.contains("scaleMatrix")) {
+		node->angle = 0;
+		for (const Value& pointValue : parameters["scaleMatrix"].toVector()) {
+			Vector3d coeffs;
+			pointValue.getVec3(coeffs[0], coeffs[1], coeffs[2]);
+			if( std::isfinite(coeffs[2]))
+				coeffs[2] = coeffs[1];
+			node->scaleOpe.push_back(coeffs);
+			node->angle += coeffs[0];
+		 }
+		 node->nbRotation = fabs(node->angle / 360);	
+	}
+	
 	double xScale, yScale;
 	if(parameters["xScale"].getFiniteDouble(xScale)) {
 		if(xScale <0) xScale  *= -1;

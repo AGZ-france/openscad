@@ -1,5 +1,6 @@
 #pragma once
 
+#include "geometry/linalg.h"
 #include "node.h"
 #include "Value.h"
 
@@ -22,6 +23,8 @@ public:
         zRotate = 0.0;
         xRotate = 0.0;
         xOffsetEnd = 0.0;
+        // AGZ 16/12/2024: Extension scaling
+        xScalBegin = yScalBegin = 1;
 	}
 	std::string toString() const override;
 	std::string name() const override { return "helicoidal_extrude"; }
@@ -40,4 +43,9 @@ public:
 	double zRotate;
 	double xRotate;
 	double xOffsetEnd;
+
+    // AGZ 16/12/2024: Extension scaling
+    double xScalBegin, yScalBegin;
+    
+    std::vector<Vector3d> scaleOpe;	// Angle, xScalEnd, yScalEnd
 };

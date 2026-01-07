@@ -169,6 +169,9 @@ static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &
     // Calcul provenant de rotate extrude non fonctionnel !
     fragCircle = Calc::get_fragments_from_r(fmax(std::abs(max_x+node.xOffset), std::abs(min_x+node.xOffset)) , node.fn, node.fs, node.fa);
     fragments = (unsigned int)fmax(fragCircle * std::abs(node.angle) / 360, 1);
+    if(node.scaleOpe.size() >= 1) {
+		
+	}
     double delta_x = max_x - min_x;
     double delta_y = max_y - min_y;
     bool flip_faces = ((min_x+node.xOffset) >= 0 && node.angle > 0 && !b360) || ((min_x+node.xOffset) < 0 && (node.angle < 0 || b360));
@@ -179,8 +182,10 @@ static std::unique_ptr<Geometry> helicoidalPolygon(const HelicoidalExtrudeNode &
 
  	//step fait référence à un tour complet
 	double  ratio = (node.angle < 360) ? 360 / std::abs(node.angle) : 1.0;
-	int  frag360 =  (unsigned int)fmax(fragCircle / ratio, 1);
-    double pas = step / frag360;
+	int  frag360 =  (int)fmax(fragCircle / ratio, 1);
+    double pas0 = step / frag360;
+    double pas = step * (std::abs(node.angle) / 360) / fragments;
+    LOG(message_group::Warning,Location::NONE,"", "PAS %1$.5f / %2$.5f", pas0, pas);
     
     Transform3d rotS(angle_axis_degrees(-node.axeRotate, Vector3d::UnitY()));
     if(!b360) {
