@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # test_pretty_print by don bright 2012. Copyright assigned to Marius Kintel and
 # Clifford Wolf 2012. Released under the GPL 2, or later, as described in
@@ -10,8 +10,7 @@
 # - .png and .txt files from testname-output/*
 #
 # The result is a single html report file with images data-uri encoded
-# into the file. It can be uploaded as a single static file to a web server
-# or the 'test_upload.py' script can be used.
+# into the file.
 
 
 # Design philosophy
@@ -21,14 +20,13 @@
 # 3. save the wikified data to disk
 # 4. generate html, including base64 encoding of images
 # 5. save html file
-# 6. upload html to public site and share with others
 
 # todo
 #
 # 1. why is hash differing
 
 
-import string, sys, re, os, hashlib, subprocess, time, platform, html, base64
+import pathlib, string, sys, re, os, hashlib, subprocess, time, platform, html, base64
 
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -207,13 +205,13 @@ def png_encode64(fname, width=512, data=None, alt=''):
 
 def findlogfile(builddir):
     logpath = os.path.join(builddir, 'Testing', 'Temporary')
-    logfilename = os.path.join(logpath, 'LastTest.log.tmp')
-    if not os.path.isfile(logfilename):
-        logfilename = os.path.join(logpath, 'LastTest.log')
+    # The ctest command may not finish before the LastTest.log.tmp* is flushed,
+    # so read that file if it exists.
+    logfilename = next(pathlib.Path(logpath).glob('LastTest.log*'), None)
     if not os.path.isfile(logfilename):
         print('can\'t find and/or open logfile', logfilename)
         sys.exit()
-    return logfilename
+    return str(logfilename)
 
 # --- Templating ---
 
@@ -338,7 +336,8 @@ def to_html(project_name, startdate, tests, enddate, sysinfo, sysid, imgcomparer
 
     templates = Templates()
     for test in report_tests:
-        if test.type in ('txt', 'ast', 'csg', 'term', 'echo', 'stl', '3mf', 'off', 'obj', 'pov'):
+        # relative-output tests have no "type"
+        if test.type in ('txt', 'ast', 'csg', 'term', 'echo', 'stl', '3mf', 'off', 'obj', 'pov', 'dxf', 'svg', ''):
             text_test_count += 1
             templates.add('text_template', 'text_tests',
                           test_name=test.fullname,
@@ -372,7 +371,7 @@ def to_html(project_name, startdate, tests, enddate, sysinfo, sysid, imgcomparer
                           expected=expected_img,
                           mask=mask_img)
         else:
-            raise TypeError('Unknown test type %r' % test.type)
+            raise TypeError(f"Unknown test type '{test.type}' in test {test.fullname}")
 
     for mf in sorted(makefiles.keys()):
         mfname = mf.strip().lstrip(os.path.sep)
@@ -400,38 +399,6 @@ def to_html(project_name, startdate, tests, enddate, sysinfo, sysid, imgcomparer
                           imgcomparer=imgcomparer)
 
 # --- End Templating ---
-
-# --- Web Upload ---
-
-def postify(data):
-    return urlencode(data).encode()
-
-def create_page():
-    data = {
-        'action': 'create',
-        'type': 'html'
-    }
-    try:
-        response = urlopen('http://www.dinkypage.com', data=postify(data))
-    except:
-        return None
-    return response.geturl()
-
-def upload_html(page_url, title, html):
-    data = {
-        'mode': 'editor',
-        'title': title,
-        'html': html,
-        'ajax': '1'
-    }
-    try:
-        response = urlopen(page_url, data=postify(data))
-    except (URLError) as e:
-        print('Upload error: ' + str(e))
-        return False
-    return 'success' in response.read().decode()
-
-# --- End Web Upload ---
 
 debug_test_pp = False
 #debug_test_pp = True
@@ -474,16 +441,6 @@ def main():
         print('warning: could not find --builddir, trying to use current dir:', builddir)
     debug('build dir set to ' +  builddir)
 
-    upload = False
-    if '--upload' in sys.argv:
-        upload = True
-        debug('will upload test report')
-
-    # Workaround for old cmake's not being able to pass parameters
-    # to CTEST_CUSTOM_POST_TEST
-    if bool(os.getenv("OPENSCAD_UPLOAD_TESTS")):
-        upload = True
-
     # --- End Command Line Parsing ---
 
     sysinfo, sysid = read_sysinfo(os.path.join(builddir, 'sysinfo.txt'))
@@ -503,24 +460,6 @@ def main():
     debug('saving ' + html_filename + ' ' + str(len(html)) + ' bytes')
     trysave(html_filename, html)
     print("report saved:\n", html_filename.replace(os.getcwd()+os.path.sep,''))
-
-    failed_tests = [test for test in tests if not test.passed]
-    if upload and failed_tests:
-        build = os.getenv("TRAVIS_BUILD_NUMBER")
-        if build: filename = 'travis-' + build + '_report.html'
-        else: filename = html_basename
-        os.system('scp "%s" "%s:%s"' %
-                  (html_filename, 'openscad@files.openscad.org', 'www/tests/' + filename) )
-        share_url = 'http://files.openscad.org/tests/' + filename;
-        print('html report uploaded:')
-        print(share_url)
-
-#        page_url = create_page()
-#        if upload_html(page_url, title='OpenSCAD test results', html=html):
-#            share_url = page_url.partition('?')[0]
-#            print('html report uploaded at', share_url)
-#        else:
-#            print('could not upload html report')
 
     debug('test_pretty_print complete')
 

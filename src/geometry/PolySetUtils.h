@@ -21,4 +21,4 @@ std::shared_ptr<const PolySet> getGeometryAsPolySet(const std::shared_ptr<const 
 
 std::string polySetToPolyhedronSource(const PolySet& ps);
 
-}
+}  // namespace PolySetUtils

@@ -25,13 +25,13 @@
  */
 
 #include "geometry/PolySetBuilder.h"
+#include "geometry/linalg.h"
 #include "geometry/PolySet.h"
 #include "geometry/Geometry.h"
 
 #ifdef ENABLE_CGAL
 #include "geometry/cgal/cgalutils.h"
-#include "geometry/cgal/CGAL_Nef_polyhedron.h"
-#include "geometry/cgal/CGALHybridPolyhedron.h"
+#include "geometry/cgal/CGALNefGeometry.h"
 #endif
 #ifdef ENABLE_MANIFOLD
 #include "geometry/manifold/ManifoldGeometry.h"
@@ -46,32 +46,30 @@
 #include <vector>
 
 PolySetBuilder::PolySetBuilder(int vertices_count, int indices_count, int dim, boost::tribool convex)
-  : convex_(convex), dim_(dim)
+  : dim_(dim), convex_(convex)
 {
   reserve(vertices_count, indices_count);
 }
 
-void PolySetBuilder::reserve(int vertices_count, int indices_count) {
+void PolySetBuilder::reserve(int vertices_count, int indices_count)
+{
   if (vertices_count != 0) vertices_.reserve(vertices_count);
   if (indices_count != 0) indices_.reserve(indices_count);
 }
 
-void PolySetBuilder::setConvexity(int convexity){
-  convexity_ = convexity;
-}
+void PolySetBuilder::setConvexity(int convexity) { convexity_ = convexity; }
 
-int PolySetBuilder::numVertices() const {
-  return vertices_.size();
-}
+void PolySetBuilder::addColor(const Color4f& color) { colors_.push_back(color); }
 
-int PolySetBuilder::numPolygons() const {
-  return indices_.size();
-}
+void PolySetBuilder::addColorIndex(const int32_t idx) { color_indices_.push_back(idx); }
 
-int PolySetBuilder::vertexIndex(const Vector3d& pt)
-{
-  return vertices_.lookup(pt);
-}
+int PolySetBuilder::numVertices() const { return vertices_.size(); }
+
+int PolySetBuilder::numPolygons() const { return indices_.size(); }
+
+bool PolySetBuilder::isEmpty() const { return vertices_.size() == 0 && indices_.size() == 0; }
+
+int PolySetBuilder::vertexIndex(const Vector3d& pt) { return vertices_.lookup(pt); }
 
 void PolySetBuilder::appendGeometry(const std::shared_ptr<const Geometry>& geom)
 {
@@ -82,27 +80,22 @@ void PolySetBuilder::appendGeometry(const std::shared_ptr<const Geometry>& geom)
   } else if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
     appendPolySet(*ps);
 #ifdef ENABLE_CGAL
-  } else if (const auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
+  } else if (const auto N = std::dynamic_pointer_cast<const CGALNefGeometry>(geom)) {
     if (const auto ps = CGALUtils::createPolySetFromNefPolyhedron3(*(N->p3))) {
       appendPolySet(*ps);
-    }
-    else {
+    } else {
       LOG(message_group::Error, "Nef->PolySet failed");
     }
-  } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) {
-    // TODO(ochafik): Implement appendGeometry(Surface_mesh) instead of converting to PolySet
-    appendPolySet(*hybrid->toPolySet());
-#endif // ifdef ENABLE_CGAL
+#endif  // ifdef ENABLE_CGAL
 #ifdef ENABLE_MANIFOLD
   } else if (const auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     appendPolySet(*mani->toPolySet());
 #endif
-  } else if (std::dynamic_pointer_cast<const Polygon2d>(geom)) { // NOLINT(bugprone-branch-clone)
+  } else if (std::dynamic_pointer_cast<const Polygon2d>(geom)) {  // NOLINT(bugprone-branch-clone)
     assert(false && "Unsupported geometry");
-  } else { // NOLINT(bugprone-branch-clone)
+  } else {  // NOLINT(bugprone-branch-clone)
     assert(false && "Not implemented");
   }
-
 }
 
 void PolySetBuilder::appendPolygon(const std::vector<int>& inds)
@@ -115,11 +108,12 @@ void PolySetBuilder::appendPolygon(const std::vector<int>& inds)
 void PolySetBuilder::appendPolygon(const std::vector<Vector3d>& polygon)
 {
   beginPolygon(polygon.size());
-  for (const auto& v: polygon) addVertex(v);
+  for (const auto& v : polygon) addVertex(v);
   endPolygon();
 }
 
-void PolySetBuilder::beginPolygon(int nvertices) {
+void PolySetBuilder::beginPolygon(int nvertices)
+{
   endPolygon();
   current_polygon_.reserve(nvertices);
 }
@@ -127,23 +121,33 @@ void PolySetBuilder::beginPolygon(int nvertices) {
 void PolySetBuilder::addVertex(int ind)
 {
   // Ignore consecutive duplicate indices
-  if (current_polygon_.empty() ||
-      ind != current_polygon_.back() && ind != current_polygon_.front()) {
+  if (current_polygon_.empty() || (ind != current_polygon_.back() && ind != current_polygon_.front())) {
     current_polygon_.push_back(ind);
   }
 }
 
-void PolySetBuilder::addVertex(const Vector3d &v)
-{
-  addVertex(vertexIndex(v));
-}
+void PolySetBuilder::addVertex(const Vector3d& v) { addVertex(vertexIndex(v)); }
 
-void PolySetBuilder::endPolygon() {
+void PolySetBuilder::endPolygon(const Color4f& color)
+{
   // FIXME: Should we check for self-touching polygons (non-consecutive duplicate indices)?
 
   // FIXME: Can we move? What would the state of current_polygon_ be after move?
   if (current_polygon_.size() >= 3) {
     indices_.push_back(current_polygon_);
+
+    if (color.isValid()) {
+      if (color_indices_.empty() && indices_.size() > 1) {
+        color_indices_.resize(indices_.size() - 1, -1);
+      }
+      auto it = std::find(colors_.begin(), colors_.end(), color);
+      if (it == colors_.end()) {
+        color_indices_.push_back(colors_.size());
+        colors_.push_back(color);
+      } else {
+        color_indices_.push_back(it - colors_.begin());
+      }
+    }
   }
   current_polygon_.clear();
 }
@@ -160,7 +164,7 @@ void PolySetBuilder::appendPolySet(const PolySet& ps)
 
     auto nColors = ps.colors.size();
     std::vector<uint32_t> color_map(nColors);
-    for (int i = 0; i < nColors; i++) {
+    for (size_t i = 0; i < nColors; i++) {
       const auto& color = ps.colors[i];
       // Find index of color in colors_, or add it if it doesn't exist
       auto it = std::find(colors_.begin(), colors_.end(), color);
@@ -182,7 +186,7 @@ void PolySetBuilder::appendPolySet(const PolySet& ps)
   reserve(numVertices() + ps.vertices.size(), numPolygons() + ps.indices.size());
   for (const auto& poly : ps.indices) {
     beginPolygon(poly.size());
-    for (const auto& ind: poly) {
+    for (const auto& ind : poly) {
       addVertex(ps.vertices[ind]);
     }
     endPolygon();

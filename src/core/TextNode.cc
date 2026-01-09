@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "core/Children.h"
+#include "core/EvaluationSession.h"
 #include "core/module.h"
 #include "core/ModuleInstantiation.h"
 #include "core/Parameters.h"
@@ -39,53 +40,36 @@
 
 #include "core/FreetypeRenderer.h"
 
-#include <boost/assign/std/vector.hpp>
-using namespace boost::assign; // bring 'operator+=()' into scope
-
-static std::shared_ptr<AbstractNode> builtin_text(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_text(const ModuleInstantiation *inst, Arguments arguments)
 {
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", inst->name());
-  }
-
-  auto node = std::make_shared<TextNode>(inst);
-
   auto *session = arguments.session();
-  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
-                                            {"text", "size", "font"},
-                                            {"direction", "language", "script", "halign", "valign", "spacing"}
-                                            );
+  Parameters parameters =
+    Parameters::parse(std::move(arguments), inst->location(), {"text", "size", "font"},
+                      {"direction", "language", "script", "halign", "valign", "spacing"});
   parameters.set_caller("text");
 
-  node->params.set_loc(inst->location());
-  node->params.set_documentPath(session->documentRoot());
-  node->params.set(parameters);
-  node->params.detect_properties();
+  auto p = FreetypeRenderer::Params(parameters);
 
-  return node;
+  p.set_loc(inst->location());
+  p.set_documentPath(session->documentRoot());
+  p.detect_properties();
+
+  return std::make_shared<TextNode>(inst, std::move(p));
 }
 
-std::vector<std::shared_ptr<const Geometry>> TextNode::createGeometryList() const
+std::vector<std::shared_ptr<const Polygon2d>> TextNode::createPolygonList() const
 {
   FreetypeRenderer renderer;
-  return renderer.render(this->get_params());
+  return renderer.render(params);
 }
 
-FreetypeRenderer::Params TextNode::get_params() const
-{
-  return params;
-}
-
-std::string TextNode::toString() const
-{
-  return STR(name(), "(", this->params, ")");
-}
+std::string TextNode::toString() const { return STR(name(), "(", this->params, ")"); }
 
 void register_builtin_text()
 {
-  Builtins::init("text", new BuiltinModule(builtin_text),
-  {
-    R"(text(text = "", size = 10, font = "", halign = "left", valign = "baseline", spacing = 1, direction = "ltr", language = "en", script = "latin"[, $fn]))",
-  });
+  Builtins::init(
+    "text", new BuiltinModule(builtin_text),
+    {
+      R"(text(text = "", size = 10, font = "", halign = "left", valign = "baseline", spacing = 1, direction = "ltr", language = "en", script = "latin"[, $fn]))",
+    });
 }

@@ -5,7 +5,9 @@
 #include <vector>
 
 #include "core/node.h"
+#include "core/ModuleInstantiation.h"
 #include "core/FreetypeRenderer.h"
+#include "geometry/Polygon2d.h"
 
 class TextModule;
 
@@ -13,14 +15,15 @@ class TextNode : public AbstractPolyNode
 {
 public:
   VISITABLE();
-  TextNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) {}
+  TextNode(const ModuleInstantiation *mi, FreetypeRenderer::Params&& p)
+    : AbstractPolyNode(mi), params(std::move(p))
+  {
+  }
 
   std::string toString() const override;
   std::string name() const override { return "text"; }
 
-  virtual std::vector<std::shared_ptr<const Geometry>> createGeometryList() const;
-
-  virtual FreetypeRenderer::Params get_params() const;
+  std::vector<std::shared_ptr<const Polygon2d>> createPolygonList() const;
 
   FreetypeRenderer::Params params;
 };

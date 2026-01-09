@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdio>
 #include <string>
 #include <map>
 #include <vector>
@@ -13,18 +12,23 @@ public:
   using list_t = std::vector<Feature *>;
   using iterator = list_t::iterator;
 
-  static const Feature ExperimentalFastCsg;
-  static const Feature ExperimentalFastCsgSafer;
-  static const Feature ExperimentalFastCsgDebug;
   static const Feature ExperimentalRoof;
   static const Feature ExperimentalInputDriverDBus;
   static const Feature ExperimentalLazyUnion;
   static const Feature ExperimentalVxORenderersIndexing;
   static const Feature ExperimentalTextMetricsFunctions;
   static const Feature ExperimentalImportFunction;
+  static const Feature ExperimentalObjectFunction;
   static const Feature ExperimentalPredictibleOutput;
+  static const Feature ExperimentalVectorSwizzle;
 #ifdef ENABLE_PYTHON
   static const Feature ExperimentalPythonEngine;
+#endif
+
+#ifdef ENABLE_GUI_TESTS
+  static constexpr bool HasGuiTesting{true};
+#else
+  static constexpr bool HasGuiTesting{false};
 #endif
 
   [[nodiscard]] const std::string& get_name() const;

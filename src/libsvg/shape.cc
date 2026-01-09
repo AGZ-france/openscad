@@ -35,6 +35,9 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/spirit/include/qi.hpp>
 
+#include <clipper2/clipper.offset.h>
+
+#include "geometry/ClipperUtils.h"
 #include "libsvg/circle.h"
 #include "libsvg/ellipse.h"
 #include "libsvg/line.h"
@@ -55,8 +58,7 @@
 
 namespace libsvg {
 
-shape *
-shape::create_from_name(const char *name)
+shape *shape::create_from_name(const char *name)
 {
   if (circle::name == name) {
     return new circle();
@@ -89,8 +91,7 @@ shape::create_from_name(const char *name)
   }
 }
 
-void
-shape::set_attrs(attr_map_t& attrs, void *context)
+void shape::set_attrs(attr_map_t& attrs, void *context)
 {
   if (attrs.find("id") != attrs.end()) {
     this->id = attrs["id"];
@@ -121,8 +122,7 @@ shape::set_attrs(attr_map_t& attrs, void *context)
   selected = (ctx->selector) ? ctx->selector(this) : false;
 }
 
-const std::string
-shape::get_style(const std::string& name) const
+const std::string shape::get_style(const std::string& name) const
 {
   std::vector<std::string> styles;
   boost::split(styles, this->style, boost::is_any_of(";"));
@@ -142,8 +142,7 @@ shape::get_style(const std::string& name) const
   return std::string();
 }
 
-double
-shape::get_stroke_width() const
+double shape::get_stroke_width() const
 {
   double stroke_width;
   if (this->stroke_width.empty()) {
@@ -154,8 +153,7 @@ shape::get_stroke_width() const
   return stroke_width < 0.01 ? 1 : stroke_width;
 }
 
-ClipperLib::EndType
-shape::get_stroke_linecap() const
+Clipper2Lib::EndType shape::get_stroke_linecap() const
 {
   std::string cap;
   if (this->stroke_linecap.empty()) {
@@ -165,17 +163,16 @@ shape::get_stroke_linecap() const
   }
 
   if (cap == "butt") {
-    return ClipperLib::etOpenButt;
+    return Clipper2Lib::EndType::Butt;
   } else if (cap == "round") {
-    return ClipperLib::etOpenRound;
+    return Clipper2Lib::EndType::Round;
   } else if (cap == "square") {
-    return ClipperLib::etOpenSquare;
+    return Clipper2Lib::EndType::Square;
   }
-  return ClipperLib::etOpenButt;
+  return Clipper2Lib::EndType::Butt;
 }
 
-ClipperLib::JoinType
-shape::get_stroke_linejoin() const
+Clipper2Lib::JoinType shape::get_stroke_linejoin() const
 {
   std::string join;
   if (this->stroke_linejoin.empty()) {
@@ -184,17 +181,16 @@ shape::get_stroke_linejoin() const
     join = this->stroke_linejoin;
   }
   if (join == "bevel") {
-    return ClipperLib::jtSquare;
+    return Clipper2Lib::JoinType::Square;
   } else if (join == "round") {
-    return ClipperLib::jtRound;
+    return Clipper2Lib::JoinType::Round;
   } else if (join == "miter") {
-    return ClipperLib::jtMiter;
+    return Clipper2Lib::JoinType::Miter;
   }
-  return ClipperLib::jtMiter;
+  return Clipper2Lib::JoinType::Miter;
 }
 
-void
-shape::collect_transform_matrices(std::vector<Eigen::Matrix3d>& matrices, shape *s)
+void shape::collect_transform_matrices(std::vector<Eigen::Matrix3d>& matrices, shape *s)
 {
   std::string transform_arg(s->transform);
 
@@ -220,27 +216,13 @@ shape::collect_transform_matrices(std::vector<Eigen::Matrix3d>& matrices, shape 
         t = nullptr;
       }
       switch (v[0]) {
-      case 'm':
-        t = new matrix();
-        break;
-      case 't':
-        t = new translate();
-        break;
-      case 's':
-        t = new scale();
-        break;
-      case 'r':
-        t = new rotate();
-        break;
-      case 'x':
-        t = new skew_x();
-        break;
-      case 'y':
-        t = new skew_y();
-        break;
-      default:
-        std::cout << "unknown transform op " << v << std::endl;
-        t = nullptr;
+      case 'm': t = new matrix(); break;
+      case 't': t = new translate(); break;
+      case 's': t = new scale(); break;
+      case 'r': t = new rotate(); break;
+      case 'x': t = new skew_x(); break;
+      case 'y': t = new skew_y(); break;
+      default:  std::cout << "unknown transform op " << v << std::endl; t = nullptr;
       }
     } else {
       if (t) {
@@ -260,8 +242,7 @@ shape::collect_transform_matrices(std::vector<Eigen::Matrix3d>& matrices, shape 
   }
 }
 
-bool
-shape::is_excluded() const
+bool shape::is_excluded() const
 {
   for (const shape *s = this; s != nullptr; s = s->get_parent()) {
     if (s->selected) return false;
@@ -270,8 +251,7 @@ shape::is_excluded() const
   return true;
 }
 
-void
-shape::apply_transform()
+void shape::apply_transform()
 {
   std::vector<Eigen::Matrix3d> matrices;
   for (shape *s = this; s->get_parent() != nullptr; s = s->get_parent()) {
@@ -293,33 +273,37 @@ shape::apply_transform()
   path_list = result_list;
 }
 
-void
-shape::offset_path(path_list_t& path_list, path_t& path, double stroke_width, ClipperLib::EndType stroke_linecap) {
-  ClipperLib::Path line;
-  ClipperLib::Paths result;
+void shape::offset_path(path_list_t& path_list, path_t& path, double stroke_width,
+                        Clipper2Lib::EndType stroke_linecap)
+{
+  const int scale_bits = ClipperUtils::scaleBitsFromPrecision();
+  const double scale = std::ldexp(1.0, scale_bits);
+
+  Clipper2Lib::Path64 line;
   for (const auto& v : path) {
-    line << ClipperLib::IntPoint(v.x() * 10000, v.y() * 10000);
+    line.emplace_back(v.x() * scale, v.y() * scale);
   }
 
-  ClipperLib::ClipperOffset co;
+  Clipper2Lib::ClipperOffset co;
   co.AddPath(line, get_stroke_linejoin(), stroke_linecap);
-  co.Execute(result, stroke_width * 5000.0);
+  Clipper2Lib::Paths64 result;
+  co.Execute(stroke_width * scale / 2, result);
 
   for (const auto& p : result) {
     path_list.push_back(path_t());
     for (const auto& point : p) {
-      path_list.back().push_back(Eigen::Vector3d(point.X / 10000.0, point.Y / 10000.0, 0));
+      path_list.back().push_back(Eigen::Vector3d(point.x / scale, point.y / scale, 0));
     }
-    path_list.back().push_back(Eigen::Vector3d(p[0].X / 10000.0, p[0].Y / 10000.0, 0));
+    path_list.back().push_back(Eigen::Vector3d(p[0].x / scale, p[0].y / scale, 0));
   }
 }
 
-void
-shape::draw_ellipse(path_t& path, double x, double y, double rx, double ry, void *context) {
+void shape::draw_ellipse(path_t& path, double x, double y, double rx, double ry, void *context)
+{
   const auto *fValues = reinterpret_cast<const fnContext *>(context);
   double rmax = fmax(rx, ry);
-  unsigned long fn = Calc::get_fragments_from_r(rmax, fValues->fn, fValues->fs, fValues->fa);
-  if (fn < 40) fn = 40;   // preserve the old minimum value
+  unsigned long fn = fValues->getCircularSegmentCount(rmax, 360.0).value_or(3);
+  if (fn < 40) fn = 40;  // Use the old value as a minimum
   for (unsigned long idx = 1; idx <= fn; ++idx) {
     const double a = idx * 360.0 / fn;
     const double xx = rx * sin_degrees(a) + x;
@@ -328,8 +312,8 @@ shape::draw_ellipse(path_t& path, double x, double y, double rx, double ry, void
   }
 }
 
-std::vector<std::shared_ptr<shape>>
-shape::clone_children() {
+std::vector<std::shared_ptr<shape>> shape::clone_children()
+{
   std::vector<std::shared_ptr<shape>> ret_vector;
   std::vector<shape *> children_backup = this->get_children();
   this->children.clear();
@@ -348,4 +332,4 @@ std::ostream& operator<<(std::ostream& os, const shape& s)
   return os << s.dump() << " | id = '" << s.id.value_or("") << "', transform = '" << s.transform << "'";
 }
 
-} // namespace libsvg
+}  // namespace libsvg

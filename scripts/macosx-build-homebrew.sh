@@ -49,7 +49,7 @@ then
 fi
 $TAP tap openscad/homebrew-tap
 
-for formula in pkg-config boost eigen cgal glew glib opencsg freetype libzip libxml2 fontconfig harfbuzz lib3mf double-conversion imagemagick ccache ghostscript tbb; do
+for formula in pkg-config boost eigen cgal glew glib opencsg freetype libzip libxml2 fontconfig harfbuzz lib3mf double-conversion imagemagick ccache ghostscript tbb catch2; do
   log "Installing formula $formula"
   brew ls --versions $formula
   time brew install $formula
@@ -72,5 +72,3 @@ else
   brew unlink qscintilla2
   brew install qscintilla2.rb
 fi
-
-$TAP untap openscad/homebrew-tap || true
