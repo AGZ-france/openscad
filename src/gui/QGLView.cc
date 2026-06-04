@@ -25,8 +25,11 @@
  */
 
 #include "gui/QGLView.h"
+#include <cmath>
+#include <memory>
 #include <QtCore/qpoint.h>
 
+#include "core/Selection.h"
 #include "geometry/linalg.h"
 #include "gui/qtgettext.h"
 #include "gui/Preferences.h"
@@ -39,6 +42,7 @@
 
 #include <QImage>
 #include <QOpenGLWidget>
+#include <QSurfaceFormat>
 #include <QWidget>
 #include <iostream>
 #include <QApplication>
@@ -69,7 +73,25 @@
 #include "gui/qt-obsolete.h"
 #include "gui/Measurement.h"
 
-QGLView::QGLView(QWidget *parent) : QOpenGLWidget(parent) { init(); }
+namespace {
+
+QSurfaceFormat compatibleWidgetFormat()
+{
+  auto format = QSurfaceFormat::defaultFormat();
+  format.setRenderableType(QSurfaceFormat::OpenGL);
+  format.setProfile(QSurfaceFormat::CompatibilityProfile);
+  if (format.depthBufferSize() < 24) format.setDepthBufferSize(24);
+  if (format.stencilBufferSize() < 8) format.setStencilBufferSize(8);
+  return format;
+}
+
+}  // namespace
+
+QGLView::QGLView(QWidget *parent) : QOpenGLWidget(parent)
+{
+  setFormat(compatibleWidgetFormat());
+  init();
+}
 
 QGLView::~QGLView()
 {
@@ -87,7 +109,10 @@ void QGLView::init()
   setMouseTracking(true);
 }
 
-void QGLView::resetView() { cam.resetView(); }
+void QGLView::resetView()
+{
+  cam.resetView();
+}
 
 void QGLView::viewAll()
 {
@@ -124,6 +149,8 @@ void QGLView::initializeGL()
   GLView::initializeGL();
 
   this->selector = std::make_unique<MouseSelector>(this);
+
+  emit initialized();
 }
 
 std::string QGLView::getRendererInfo() const
@@ -256,6 +283,11 @@ void QGLView::mouseDoubleClickEvent(QMouseEvent *event)
 {
   QOpenGLContext *oldContext = getGLContext();
   this->makeCurrent();
+  auto guard = sg::make_scope_guard([this, oldContext] {
+    this->doneCurrent();
+    setGLContext(oldContext);
+  });
+
   setupCamera();
 
   int viewport[4];
@@ -279,12 +311,10 @@ void QGLView::mouseDoubleClickEvent(QMouseEvent *event)
                       .arg(QString::fromLocal8Bit((const char *)gluErrorString(glError)));
       statusLabel->setText(status);
     }
-    setGLContext(oldContext);
     return;
   }
 
   if (z == 1) {
-    setGLContext(oldContext);
     return;  // outside object
   }
 
@@ -297,7 +327,6 @@ void QGLView::mouseDoubleClickEvent(QMouseEvent *event)
     update();
     emit cameraChanged();
   }
-  setGLContext(oldContext);
 }
 
 void QGLView::normalizeAngle(GLdouble& angle)
@@ -313,7 +342,7 @@ void QGLView::mouseMoveEvent(QMouseEvent *event)
 #else
   auto this_mouse = event->globalPos();
 #endif
-  if (measure_state != MEASURE_IDLE) {
+  if (measure_state != Measurement::MEASURE_IDLE) {
     QPoint pt = event->pos();
     this->shown_obj = findObject(pt.x(), pt.y());
     update();
@@ -427,7 +456,10 @@ const QImage& QGLView::grabFrame()
   return this->frame;
 }
 
-bool QGLView::save(const char *filename) const { return this->frame.save(filename, "PNG"); }
+bool QGLView::save(const char *filename) const
+{
+  return this->frame.save(filename, "PNG");
+}
 
 void QGLView::wheelEvent(QWheelEvent *event)
 {
@@ -442,9 +474,15 @@ void QGLView::wheelEvent(QWheelEvent *event)
   }
 }
 
-void QGLView::ZoomIn() { zoom(120, true); }
+void QGLView::ZoomIn()
+{
+  zoom(120, true);
+}
 
-void QGLView::ZoomOut() { zoom(-120, true); }
+void QGLView::ZoomOut()
+{
+  zoom(-120, true);
+}
 
 void QGLView::zoom(double v, bool relative)
 {

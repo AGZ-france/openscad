@@ -25,10 +25,10 @@
  */
 #include "utils/calc.h"
 
+#include <algorithm>
+#include <cassert>
 #include <cmath>
 
-#include <cassert>
-#include <algorithm>
 #include "geometry/Grid.h"
 #include "utils/degree_trig.h"
 
@@ -36,7 +36,8 @@
 double Calc::lerp(double a, double b, double t) {
   return (1 - t) * a + t * b;
 }
-
+#define NotYetUsed
+#ifdef NotYetUsed
 /*!
    Returns the number of subdivision of a whole circle, given radius and
    the three special variables $fn, $fs and $fa
@@ -167,3 +168,4 @@ int Calc::get_diagonal_slices(double delta_sqr, double height, double fn, double
   int fs_slices = static_cast<int>(ceil(sqrt(delta_sqr + height * height) / fs));
   return std::max(fs_slices, min_slices);
 }
+#endif

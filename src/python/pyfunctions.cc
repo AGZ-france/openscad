@@ -25,30 +25,39 @@
  */
 
 #include <Python.h>
-#include "python/pyopenscad.h"
-#include "core/primitives.h"
-#include "core/CsgOpNode.h"
+
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <string>
+
+#include "core/CgalAdvNode.h"
 #include "core/ColorNode.h"
 #include "core/ColorUtil.h"
-#include "core/FreetypeRenderer.h"
-#include "core/TransformNode.h"
-#include "core/LinearExtrudeNode.h"
-#include "core/RotateExtrudeNode.h"
-#include "core/CgalAdvNode.h"
-#include "core/RoofNode.h"
-#include "core/RenderNode.h"
-#include "core/SurfaceNode.h"
-#include "core/TextNode.h"
+#include "core/CsgOpNode.h"
 #include "core/CurveDiscretizer.h"
+#include "core/FreetypeRenderer.h"
+#include "core/LinearExtrudeNode.h"
 #include "core/OffsetNode.h"
 #include "core/ProjectionNode.h"
+#include "core/RenderNode.h"
+#include "core/RoofNode.h"
+#include "core/RotateExtrudeNode.h"
+#include "core/SurfaceNode.h"
+#include "core/TextNode.h"
+#include "core/TransformNode.h"
 #include "core/Tree.h"
+#include "core/enums.h"
+#include "core/node.h"
+#include "core/primitives.h"
+#include "geometry/GeometryEvaluator.h"
 #include "geometry/PolySet.h"
 #include "geometry/PolySetUtils.h"
-#include "geometry/GeometryEvaluator.h"
-#include "utils/degree_trig.h"
-#include "io/fileutils.h"
 #include "handle_dep.h"
+#include "io/fileutils.h"
+#include "python/pyopenscad.h"
+#include "utils/degree_trig.h"
 
 PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -914,7 +923,7 @@ PyObject *python_show_core(PyObject *obj)
     return NULL;
   }
   python_result_node = child;
-  return Py_None;
+  Py_RETURN_NONE;
 }
 
 PyObject *python_show(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1094,7 +1103,7 @@ PyObject *python_mesh_core(PyObject *obj, bool tessellate)
     }
     return pyth_outlines;
   }
-  return Py_None;
+  Py_RETURN_NONE;
 }
 
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1440,9 +1449,18 @@ PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
   std::shared_ptr<AbstractNode> child[2];
   PyObject *child_dict[2];
 
-  if (arg1 == Py_None && mode == OpenSCADOperator::UNION) return arg2;
-  if (arg2 == Py_None && mode == OpenSCADOperator::UNION) return arg1;
-  if (arg2 == Py_None && mode == OpenSCADOperator::DIFFERENCE) return arg1;
+  if (arg1 == Py_None && mode == OpenSCADOperator::UNION) {
+    Py_INCREF(arg2);
+    return arg2;
+  }
+  if (arg2 == Py_None && mode == OpenSCADOperator::UNION) {
+    Py_INCREF(arg1);
+    return arg1;
+  }
+  if (arg2 == Py_None && mode == OpenSCADOperator::DIFFERENCE) {
+    Py_INCREF(arg1);
+    return arg1;
+  }
 
   child[0] = PyOpenSCADObjectToNodeMulti(arg1, &child_dict[0]);
   if (child[0] == NULL) {
@@ -2091,7 +2109,7 @@ PyObject *python_align_core(PyObject *obj, PyObject *pyrefmat, PyObject *pydstma
   std::shared_ptr<AbstractNode> dstnode = PyOpenSCADObjectToNode(obj, &child_dict);
   if (dstnode == nullptr) {
     PyErr_SetString(PyExc_TypeError, "Invalid align object");
-    return Py_None;
+    Py_RETURN_NONE;
   }
   DECLARE_INSTANCE();
   auto multmatnode = std::make_shared<TransformNode>(instance, "align");

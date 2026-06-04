@@ -25,14 +25,9 @@
  */
 
 #include "openscad_gui.h"
-#include <QtCore/qstringliteral.h>
-#include <memory>
-#include <filesystem>
-#include <string>
-#include <vector>
 
-#include <QtGlobal>
-#include <Qt>
+#include <QtCore/qstringliteral.h>
+
 #include <QDialog>
 #include <QDir>
 #include <QFileInfo>
@@ -41,14 +36,22 @@
 #include <QIcon>
 #include <QObject>
 #include <QPalette>
-#include <QStyleHints>
+#include <QSurfaceFormat>
 #include <QStringList>
+#include <QStyleHints>
+#include <Qt>
 #include <QtConcurrentRun>
+#include <QtGlobal>
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "Feature.h"
-#include "core/parsersettings.h"
-#include "core/Settings.h"
 #include "FontCache.h"
+#include "core/Settings.h"
+#include "core/parsersettings.h"
 #include "geometry/Geometry.h"
 #include "gui/AppleEvents.h"
 #include "gui/input/InputDriverManager.h"
@@ -71,8 +74,8 @@
 #include "gui/LaunchingScreen.h"
 #include "gui/MainWindow.h"
 #include "gui/OpenSCADApp.h"
-#include "gui/QSettingsCached.h"
 #include "gui/Preferences.h"
+#include "gui/QSettingsCached.h"
 #include "openscad.h"
 #include "platform/CocoaUtils.h"
 #include "utils/printutils.h"
@@ -108,6 +111,25 @@ bool isDarkMode()
 #endif  // QT_VERSION
 }
 
+void configureOpenGLContext()
+{
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+  // OpenSCAD still relies on legacy OpenGL compatibility features and GLSL 1.20
+  // shaders, so a GLES context is not currently usable. On Wayland/EGL setups Qt
+  // can otherwise pick OpenGL ES by default.
+  if (qEnvironmentVariableIsEmpty("QT_OPENGL")) {
+    QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
+  }
+
+  auto format = QSurfaceFormat::defaultFormat();
+  format.setRenderableType(QSurfaceFormat::OpenGL);
+  format.setProfile(QSurfaceFormat::CompatibilityProfile);
+  if (format.depthBufferSize() < 24) format.setDepthBufferSize(24);
+  if (format.stencilBufferSize() < 8) format.setStencilBufferSize(8);
+  QSurfaceFormat::setDefaultFormat(format);
+#endif
+}
+
 }  // namespace
 
 namespace {
@@ -123,7 +145,10 @@ QString assemblePath(const std::filesystem::path& absoluteBaseDir, const std::st
   return fileInfo.absoluteFilePath();
 }
 
-void dialogThreadFunc(FontCacheInitializer *initializer) { initializer->run(); }
+void dialogThreadFunc(FontCacheInitializer *initializer)
+{
+  initializer->run();
+}
 
 void dialogInitHandler(FontCacheInitializer *initializer, void *)
 {
@@ -157,7 +182,9 @@ void registerDefaultIcon(QString applicationFilePath)
                        QVariant(appPath));
 }
 #else
-void registerDefaultIcon(const QString&) {}
+void registerDefaultIcon(const QString&)
+{
+}
 #endif
 
 }  // namespace
@@ -171,6 +198,7 @@ void registerDefaultIcon(const QString&) {}
 int gui(std::vector<std::string>& inputFiles, const std::filesystem::path& original_path, int argc,
         char **argv, const std::string& gui_test, const bool reset_window_settings)
 {
+  configureOpenGLContext();
   OpenSCADApp app(argc, argv);
   QIcon::setThemeName(isDarkMode() ? "chokusen-dark" : "chokusen");
 
@@ -249,6 +277,8 @@ int gui(std::vector<std::string>& inputFiles, const std::filesystem::path& origi
 
   QObject::connect(GlobalPreferences::inst(), &Preferences::applicationFontChanged, &app,
                    &OpenSCADApp::setApplicationFont);
+  QObject::connect(GlobalPreferences::inst(), &Preferences::renderBackend3DChanged, &app,
+                   &OpenSCADApp::setRenderBackend3D);
 
   set_render_color_scheme(arg_colorscheme, false);
   auto noInputFiles = false;
@@ -259,7 +289,14 @@ int gui(std::vector<std::string>& inputFiles, const std::filesystem::path& origi
   }
 
   auto showOnStartup = settings.value("launcher/showOnStartup");
-  if (noInputFiles && (showOnStartup.isNull() || showOnStartup.toBool())) {
+  bool showLauncher = noInputFiles && (showOnStartup.isNull() || showOnStartup.toBool());
+#ifdef ENABLE_GUI_TESTS
+  if (gui_test != "none") {
+    showLauncher = false;
+  }
+#endif
+
+  if (showLauncher) {
     LaunchingScreen launcher;
     if (launcher.exec() == QDialog::Accepted) {
       if (launcher.isForceShowEditor()) {

@@ -23,13 +23,23 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include <Python.h>
-#include <filesystem>
-
 #include "pyopenscad.h"
+
+#include <Python.h>
+
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <string>
+
 #include "core/CsgOpNode.h"
 #include "core/CurveDiscretizer.h"
+#include "core/enums.h"
+#include "core/node.h"
 #include "platform/PlatformUtils.h"
+#include "utils/printutils.h"
 
 namespace fs = std::filesystem;
 
@@ -38,7 +48,10 @@ extern "C" PyObject *PyInit_openscad(void);
 bool python_active;
 bool python_trusted;
 
-void PyObjectDeleter(PyObject *pObject) { Py_XDECREF(pObject); };
+void PyObjectDeleter(PyObject *pObject)
+{
+  Py_XDECREF(pObject);
+};
 
 PyObjectUniquePtr pythonInitDict(nullptr, PyObjectDeleter);
 PyObjectUniquePtr pythonMainModule(nullptr, PyObjectDeleter);
@@ -112,6 +125,12 @@ void python_unlock(void)
 
 std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj, PyObject **dict)
 {
+  // Verify obj is actually a PyOpenSCADType before casting to avoid segfault
+  if (!PyObject_IsInstance(obj, reinterpret_cast<PyObject *>(&PyOpenSCADType))) {
+    *dict = nullptr;
+    return nullptr;
+  }
+
   std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *)obj)->node;
   if (result.use_count() > 2) {
     result = result->clone();
@@ -442,7 +461,9 @@ void initPython(const std::string& binDir, double time)
   PyRun_String(stream.str().c_str(), Py_file_input, pythonInitDict.get(), pythonInitDict.get());
 }
 
-void finishPython(void) {}
+void finishPython(void)
+{
+}
 
 std::string evaluatePython(const std::string& code, bool dry_run)
 {
@@ -589,7 +610,10 @@ static PyModuleDef OpenSCADModule = {PyModuleDef_HEAD_INIT,
                                      NULL,
                                      NULL};
 
-extern "C" PyObject *PyInit_openscad(void) { return PyModule_Create(&OpenSCADModule); }
+extern "C" PyObject *PyInit_openscad(void)
+{
+  return PyModule_Create(&OpenSCADModule);
+}
 
 PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
 {

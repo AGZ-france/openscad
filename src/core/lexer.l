@@ -42,6 +42,10 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+#ifdef _MSC_VER
+#include <io.h>
+#define isatty _isatty
+#endif
 std::string stringcontents;
 int lexerget_lineno(void);
 extern const char *parser_input_buffer;
@@ -85,7 +89,7 @@ extern YYLTYPE parserlloc;
             (loc).last_line++; \
             (loc).last_column = 1; \
         } \
-    } 
+    }
 
 #define YY_USER_ACTION parserlloc.last_column += yyleng;
 
@@ -114,6 +118,9 @@ D [0-9]
 E [Ee][+-]?{D}+
 H [0-9a-fA-F]
 
+/*
+ Patterns for matching non-ASCII UTF-8 characters.
+*/
 U       [\x80-\xbf]
 U2      [\xc2-\xdf]
 U3      [\xe0-\xef]
@@ -192,7 +199,8 @@ use[ \t\r\n]*"<"        { BEGIN(cond_use); LOCATION_COUNT_LINES(parserlloc, yyte
 }
 
 [\t ]                   { LOCATION_NEXT(parserlloc); }
-[\n\r]                  { LOCATION_ADD_LINES(parserlloc, yyleng); }
+[\n]                    { LOCATION_ADD_LINES(parserlloc, yyleng); }
+[\r]                    ;
 
 \/\/                    { BEGIN(cond_lcomment); }
 <cond_lcomment>{
@@ -245,14 +253,36 @@ use[ \t\r\n]*"<"        { BEGIN(cond_use); LOCATION_COUNT_LINES(parserlloc, yyte
 "undef"                 return TOK_UNDEF;
 
 %{/*
- U+00A0 (UTF-8 encoded: C2A0) is no-break space. We support it since Qt's QTextEdit
+ U+00A0 (UTF-8 encoded: C2 A0) is NO-BREAK SPACE. We support it since Qt's QTextEdit
  automatically converts these to spaces and we want to be able to process the same
  files on the cmd-line as in the editor.
 */%}
+\xc2\xa0
 
-[\xc2\xa0]+
+%{/*
+ U+FEFF (UTF-8 encoded: EF BB BF) is ZERO WIDTH NO-BREAK SPACE, also used in UTF-16
+ as a byte order indicator (since FFFE is not a legal Unicode code point).  It is perhaps
+ most commonly (ab)used as a marker at the start of a UTF-8 text stream to indicate that
+ the text is in UTF-8.  We slightly-incorrectly treat it as a breaking space.
+ Note that we treat it as a space anywhere in a file, not just at the top.  This is both
+ easier and handles cases where you "cat" two files together and so end up with one in
+ the middle.
+*/%}
+\xef\xbb\xbf
 
-{UNICODE}+              { parser_error_pos -= strlen(yytext); return TOK_ERROR; }
+%{/*
+ Reject any other non-ASCII UTF-8.  We will want to change this if we ever support
+ non-ASCII identifiers.
+*/%}
+{UNICODE}              { parser_error_pos -= strlen(yytext); return TOK_ERROR; }
+
+%{/*
+ A0 is a non-break space in ISO 8859-1 / Latin-1.  A naked A0 is illegal in UTF-8.
+ Valid UTF-8 will have been caught by one of the rules above, so this rule supports
+ the 8859-1 case.  Note, however, that appropriately-constructed 8859-1 strings will
+ match valid UTF-8, so using 8859-1 is not generally supported.
+*/%}
+\xa0
 
 0x{H}+                  {
                             errno = 0;  // strtoxxx have crummy error semantics
@@ -365,7 +395,7 @@ void includefile(const Location& loc)
   }
 
   loc_stack.push_back(parserlloc);
-  LOCATION_INIT(parserlloc);  
+  LOCATION_INIT(parserlloc);
   openfiles.push_back(yyin);
   openfilenames.push_back(fullname);
   filename.clear();

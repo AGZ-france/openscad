@@ -1,8 +1,8 @@
 #pragma once
 #include "linalg.h"	// Vector3d
 
-#include <string>
 #include <memory>
+#include <string>
 
 #include "geometry/Geometry.h"
 

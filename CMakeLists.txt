@@ -40,15 +40,13 @@ option(ENABLE_TESTS "Run testsuite after building." ON)
 option(ENABLE_GUI_TESTS "Compile a special version of the openscad gui with feature for testing." OFF)
 option(EXPERIMENTAL "Enable Experimental Features" OFF)
 option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" ON)
+option(USE_MANIFOLD_MINKOWSKI "Use Manifold's Minkowski instead of CGAL's" OFF)
 option(USE_BUILTIN_MANIFOLD "Use manifold from submodule" ON)
 option(USE_BUILTIN_CLIPPER2 "Use Clipper2 from submodule" ON)
+option(USE_POLYSET_FOR_CGAL "Force CGAL backend to use PolySetRenderer instead of CGALRenderer." OFF)
 option(SNAPSHOT "Create dev snapshot, uses nightly icons" OFF)
 option(HEADLESS "Build without GUI frontend" OFF)
-if(APPLE)
-  option(USE_QT6 "Build the GUI with Qt6" ON)
-else()
-option(USE_QT6 "Build the GUI with Qt6" OFF)
-endif()
+option(USE_QT6 "Build the GUI with Qt6" ON)
 option(ENABLE_EGL "Enable EGL support if available" ON)
 option(ENABLE_GLX "Enable GLX support if available" ON)
 # For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
@@ -85,8 +83,8 @@ set(WASM_BUILD_TYPE "web" CACHE STRING
   "WebAssembly build type. Support web (builds an OpenSCAD module) or node (standalone .js executable)")
 
 if (USE_QT6)
-  # Minimum version required for Qt-6.5
-  set(DEPLOYMENT_TARGET "11.0")
+  # Minimum version required for Qt-6.8
+  set(DEPLOYMENT_TARGET "12.0")
 else()
   # Minimum version required for std::filesystem
   set(DEPLOYMENT_TARGET "10.15")
@@ -611,11 +609,6 @@ target_include_directories(OpenSCADLibInternal SYSTEM PUBLIC ${LIBZIP_INCLUDE_DI
 target_link_libraries(OpenSCADLibInternal PUBLIC ${LIBZIP_LIBRARY})
 target_compile_definitions(OpenSCADLibInternal PUBLIC ENABLE_LIBZIP)
 
-find_package(Freetype 2.4.9 REQUIRED QUIET)
-message(STATUS "Freetype: ${FREETYPE_VERSION_STRING}")
-target_include_directories(OpenSCADLibInternal SYSTEM PUBLIC ${FREETYPE_INCLUDE_DIRS})
-target_link_libraries(OpenSCADLibInternal PUBLIC ${FREETYPE_LIBRARIES})
-
 find_package(LibXml2 2.9 REQUIRED QUIET)
 message(STATUS "LibXml2: ${LIBXML2_VERSION_STRING}")
 target_link_libraries(OpenSCADLibInternal PUBLIC LibXml2::LibXml2)
@@ -904,6 +897,12 @@ if(NOT HEADLESS)
   endif()
 endif()
 
+# Find after Qt which otherwise gets confused when building on MXE
+find_package(Freetype 2.4.9 REQUIRED QUIET)
+message(STATUS "Freetype: ${FREETYPE_VERSION_STRING}")
+target_include_directories(OpenSCADLibInternal SYSTEM PUBLIC ${FREETYPE_INCLUDE_DIRS})
+target_link_libraries(OpenSCADLibInternal PUBLIC ${FREETYPE_LIBRARIES})
+
 # Setup ccache (if available) to speed up recompiles. It's especially useful
 # when switching back and forth between branches where large numbers of files
 # would otherwise need to be re-compiled each time.
@@ -1027,6 +1026,7 @@ set(CORE_SOURCES
   src/core/RenderVariables.cc
   src/core/RotateExtrudeNode.cc
   src/core/ScopeContext.cc
+  src/core/Selection.cc
   src/core/Settings.cc
   src/core/SourceFile.cc
   src/core/SourceFileCache.cc
@@ -1227,6 +1227,12 @@ if(ENABLE_MANIFOLD)
   if (USE_MANIFOLD_TRIANGULATOR)
     target_compile_definitions(OpenSCADLibInternal PUBLIC USE_MANIFOLD_TRIANGULATOR)
   endif()
+  if (USE_MANIFOLD_MINKOWSKI)
+    target_compile_definitions(OpenSCADLibInternal PUBLIC USE_MANIFOLD_MINKOWSKI)
+  endif()
+  if (USE_POLYSET_FOR_CGAL)
+    target_compile_definitions(OpenSCADLibInternal PUBLIC USE_POLYSET_FOR_CGAL)
+  endif()
 endif()
 
 #
@@ -1254,13 +1260,16 @@ else()
     src/glview/GLView.cc
     src/glview/hershey.cc
     src/glview/OffscreenView.cc
-    src/glview/cgal/CGALRenderer.cc
     src/glview/PolySetRenderer.cc
     src/glview/preview/OpenCSGRenderer.cc
     src/glview/preview/ThrownTogetherRenderer.cc
     src/io/export_png.cc
     src/io/imageutils.cc
     ${GLEW_SOURCES})
+  if(NOT USE_POLYSET_FOR_CGAL)
+    list(APPEND OFFSCREEN_SOURCES
+      src/glview/cgal/CGALRenderer.cc)
+  endif()
 endif()
 
 
@@ -1299,6 +1308,10 @@ set(GUI_SOURCES
   src/gui/Measurement.cc
   src/gui/Animate.cc
   src/gui/FontList.cc
+  src/gui/ColorList.cc
+  src/gui/ColorLabel.cc
+  src/gui/ColorLayout.cc
+  src/gui/EditorColorMap.cc
   src/gui/MouseSelector.cc
   src/gui/OctoPrint.cc
   src/gui/OpenCSGWarningDialog.cc
@@ -1362,6 +1375,9 @@ set(GUI_HEADERS
     src/gui/ExportSvgDialog.h
     src/gui/OctoPrintApiKeyDialog.h
     src/gui/FontList.h
+    src/gui/ColorList.h
+    src/gui/ColorLabel.h
+    src/gui/ColorLayout.h
     src/gui/FontListTableView.h
     src/gui/IgnoreWheelWhenNotFocused.h
     src/gui/ImportUtils.h
@@ -1417,6 +1433,7 @@ set(GUI_UIS
     src/gui/ExportSvgDialog.ui
     src/gui/OctoPrintApiKeyDialog.ui
     src/gui/FontList.ui
+    src/gui/ColorList.ui
     src/gui/LaunchingScreen.ui
     src/gui/LibraryInfoDialog.ui
     src/gui/MainWindow.ui
@@ -1541,7 +1558,10 @@ elseif(WIN32)
 endif()
 
 file(GLOB_RECURSE TEST_SOURCES
-  "src/*_test.cc"
+  "src/utils/*_test.cc"
+)
+file(GLOB_RECURSE GUI_TEST_SOURCES
+  "src/gui/*_test.cc"
 )
 list(FILTER Sources EXCLUDE REGEX ".*_test[.]cc")
 list(REMOVE_ITEM Sources "src/main_wrapper.cc")
@@ -1754,7 +1774,11 @@ if(ENABLE_TESTS)
     # You can ignore it. Something about incompatibility with POSITION_INDEPENDENT_CODE
     # and how the system Catch2 static library is compiled. It should be fine.
 
-    add_executable(OpenSCADUnitTests ${TEST_SOURCES})
+    if(HEADLESS)
+      add_executable(OpenSCADUnitTests ${TEST_SOURCES})
+    else()
+      add_executable(OpenSCADUnitTests ${TEST_SOURCES} ${GUI_TEST_SOURCES})
+    endif()
     target_link_libraries(OpenSCADUnitTests PRIVATE Catch2::Catch2WithMain OpenSCADLibInternal svg)
     include(CTest)
     include(Catch)

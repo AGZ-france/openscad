@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 #include "utils/exceptions.h"
@@ -21,6 +21,7 @@ public:
   static const Feature ExperimentalObjectFunction;
   static const Feature ExperimentalPredictibleOutput;
   static const Feature ExperimentalVectorSwizzle;
+  static const Feature ExperimentalDiscretizationByError;
 #ifdef ENABLE_PYTHON
   static const Feature ExperimentalPythonEngine;
 #endif
