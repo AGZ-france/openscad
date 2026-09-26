@@ -44,7 +44,7 @@ Q_IMPORT_PLUGIN(QSvgPlugin)
 #endif
 
 class BuiltinContext;
-class CGALWorker;
+class GeometryWorker;
 class CSGNode;
 class CSGProducts;
 class FontListDialog;
@@ -52,6 +52,7 @@ class LibraryInfoDialog;
 class Preferences;
 class ProgressWidget;
 class ThrownTogetherRenderer;
+class AIDock;
 
 #include "RenderStatistic.h"
 #include "core/Tree.h"
@@ -101,6 +102,7 @@ public:
   Tree tree;
   EditorInterface *activeEditor = nullptr;
   TabManager *tabManager;
+  AIDock *aiDock;
 
   std::shared_ptr<const Geometry> rootGeom;
   std::shared_ptr<Renderer> geomRenderer;
@@ -119,8 +121,8 @@ public:
 
   Measurement::Measurement meas;
 
-  int compileErrors;
-  int compileWarnings;
+  int compileErrors = 0;
+  int compileWarnings = 0;
 
   MainWindow(const QStringList& filenames);
   ~MainWindow() override;
@@ -131,8 +133,7 @@ private:
   std::vector<std::pair<Dock *, QString>> docks;
 
   volatile bool isClosing = false;
-  bool windowStateSaved = false;
-  void saveWindowStateOnClose();
+  void saveWindowState();
   void consoleOutputRaw(const QString& msg);
   void clearAllSelectionIndicators();
   void setSelectionIndicatorStatus(EditorInterface *editor, int nodeIndex,
@@ -156,9 +157,11 @@ private:
   void setupMenusAndActions();
   void restoreWindowState();
   void openRemainingFiles(const QStringList& filenames);
+  void setupAIDock();
 
 protected:
   void closeEvent(QCloseEvent *event) override;
+  void changeEvent(QEvent *event) override;
 
 private slots:
   void updateUndockMode(bool undockMode);
@@ -276,6 +279,8 @@ private slots:
   void instantiateRoot();
   void compileDone(bool didchange);
   void compileEnded();
+  void resetCompileMessageCounts();
+  void selectPreviewViewMode();
 
 private slots:
   void on_editActionCopyVPT_triggered();
@@ -307,6 +312,9 @@ private slots:
   void onColorListDockVisibilityChanged(bool isVisible);
   void onViewportControlDockVisibilityChanged(bool isVisible);
   void onParametersDockVisibilityChanged(bool isVisible);
+
+  void onAIDockVisibilityChanged(bool isVisible);
+  void onExperimentalChanged();
 
   void onColorListColorSelected(const QString&);
 
@@ -367,7 +375,6 @@ public:
     setCurrentOutput();
     return sg::make_scope_guard([this] { clearCurrentOutput(); });
   }
-
   bool isEmpty();
 
   void onAxisChanged(InputEventAxisChanged *event) override;
@@ -453,7 +460,7 @@ private:
   bool procevents{false};
   QTemporaryFile *tempFile{nullptr};
   ProgressWidget *progresswidget{nullptr};
-  CGALWorker *cgalworker;
+  GeometryWorker *geometryWorker;
   QMutex consolemutex;
   EditorInterface *renderedEditor;  // stores pointer to editor which has been most recently rendered
   time_t includesMTime{0};          // latest include mod time

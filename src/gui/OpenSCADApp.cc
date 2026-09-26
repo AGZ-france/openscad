@@ -21,11 +21,27 @@
 
 #include "glview/RenderSettings.h"
 
+namespace {
+
+QtMessageHandler defaultMessageHandler = nullptr;
+
+void logHandler(QtMsgType type, const QMessageLogContext& ctx, const QString& msg)
+{
+  if (msg.contains("Using Qt multimedia with FFmpeg")) return;
+
+  if (defaultMessageHandler) defaultMessageHandler(type, ctx, msg);
+}
+
+}  // namespace
+
 OpenSCADApp::OpenSCADApp(int& argc, char **argv) : QApplication(argc, argv)
 {
 #ifdef Q_OS_MACOS
   this->installEventFilter(new SCADEventFilter(this));
 #endif
+
+  // Wire the log filter early in the app creation process
+  defaultMessageHandler = qInstallMessageHandler(logHandler);
 
   // Note: It may be tempting to add more initialization code here, but keep in mind that this is run as
   // part of QApplication initialization, so it's usually better to that in the main gui() function after
@@ -115,7 +131,8 @@ void OpenSCADApp::setApplicationFont(const QString& family, uint size)
   scadApp->setStyleSheet(stylesheet.arg(family, QString::number(size)));
 }
 
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+// For Qt5, simulate the Qt6 behavior.
+//
 // https://doc.qt.io/qt-6/qtcore-changes-qt6.html#other-classes
 //
 //     In Qt 5, QCoreApplication::quit() was equivalent to calling QCoreApplication::exit().
@@ -124,14 +141,18 @@ void OpenSCADApp::setApplicationFont(const QString& family, uint size)
 //     In Qt 6, the method will instead try to close all top-level windows by posting a close
 //     event. The windows are free to cancel the shutdown process by ignoring the event.
 //
-// For Qt5, simulate the Qt6 behavior.
-void OpenSCADApp::quit()
+// But this implements a slightly modified Qt6 behavior as that triggers
+// deletion of all widget windows before calling MainWindow::closeEvent.
+// We really just call close on our own list of main windows.
+void OpenSCADApp::closeApp()
 {
   for (MainWindow *mw : scadApp->windowManager.getWindows()) {
     if (!mw->close()) {
       return;
     }
   }
+  // Should not be reached, when closing the last MainWindow,
+  // the quit() call would already happen in the close event
+  // handler MainWindow::closeEvent().
   QApplication::quit();
 }
-#endif

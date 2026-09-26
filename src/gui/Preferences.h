@@ -23,8 +23,10 @@
 #include "gui/qtgettext.h"  // IWYU pragma: keep
 #include "openscad_gui.h"
 #include "ui_Preferences.h"
+#include "json/json.hpp"
 
 class GlobalPreferences;
+class QTimer;
 class Preferences : public QMainWindow, public Ui::Preferences, public InitConfigurator
 {
   Q_OBJECT;
@@ -154,6 +156,25 @@ public slots:
   void on_checkBoxAlwaysShowExport3mfDialog_toggled(bool);
   void on_checkBoxAlwaysShowPrintServiceDialog_toggled(bool);
 
+  // Network
+  void on_lineEditCaCertPath_editingFinished();
+  void on_toolButtonCaCertBrowse_clicked();
+  void on_checkBoxTlsSkipVerify_toggled(bool);
+
+  // AI Config Slots
+  void on_comboBoxAIProfile_currentIndexChanged(int);
+  void on_pushButtonAINewProfile_clicked();
+  void on_pushButtonAIDeleteProfile_clicked();
+  void on_lineEditAIApiEndpoint_textChanged(const QString&);
+  void on_lineEditAIApiKey_textChanged(const QString&);
+  void on_pushButtonAIParamAdd_clicked();
+  void on_pushButtonAIParamRemove_clicked();
+  void on_tableWidgetAIParams_itemChanged(class QTableWidgetItem *item);
+
+private:
+  void loadAIParams(const QString& profileName);
+  void saveAIParams();
+
 signals:
   void requestRedraw() const;
   void updateUndockMode(bool undockMode) const;
@@ -178,6 +199,14 @@ private slots:
   void on_lineEditStepSize_textChanged(const QString& arg1);
 
   void on_checkBoxEnableNumberScrollWheel_toggled(bool checked);
+
+  void on_checkBoxAutocompleteIncludeVariables_toggled(bool state);
+
+  void on_checkBoxAutocompleteIncludeModules_toggled(bool state);
+
+  void on_checkBoxAutocompleteIncludeFunctions_toggled(bool state);
+
+  void on_comboBoxAutoCompletionMode_activated(int val);
 
 private:
   friend GlobalPreferences;
@@ -204,6 +233,10 @@ private:
 
   QSettings::SettingsMap defaultmap;
   QHash<const QAction *, QWidget *> prefPages;
+  nlohmann::json inMemoryAISettings;
+  QTimer *aiSaveTimer = nullptr;
+  QString currentLoadedProfileName;
+  bool printPageSetupDone{false};
 };
 
 class GlobalPreferences

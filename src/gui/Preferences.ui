@@ -27,7 +27,7 @@
     <item row="0" column="0">
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="currentIndex">
-       <number>5</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="page3DView">
        <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -135,9 +135,9 @@
            <property name="geometry">
             <rect>
              <x>0</x>
-             <y>0</y>
-             <width>824</width>
-             <height>933</height>
+             <y>-247</y>
+             <width>831</width>
+             <height>1019</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_5">
@@ -280,10 +280,10 @@
                <property name="rightMargin">
                 <number>9</number>
                </property>
-               <item row="0" column="0">
-                <widget class="QCheckBox" name="checkBoxEnableAutocomplete">
+               <item row="4" column="0">
+                <widget class="QCheckBox" name="checkBoxAutocompleteIncludeModules">
                  <property name="text">
-                  <string>Enable Autocompletion</string>
+                  <string> Include defined modules</string>
                  </property>
                 </widget>
                </item>
@@ -298,6 +298,68 @@
                  </item>
                  <item>
                   <widget class="QLineEdit" name="lineEditCharacterThreshold"/>
+                 </item>
+                </layout>
+               </item>
+               <item row="5" column="0">
+                <widget class="QCheckBox" name="checkBoxAutocompleteIncludeFunctions">
+                 <property name="text">
+                  <string> Include defined functions</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="0">
+                <widget class="QCheckBox" name="checkBoxEnableAutocomplete">
+                 <property name="text">
+                  <string>Enable Autocompletion</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="0">
+                <widget class="QCheckBox" name="checkBoxAutocompleteIncludeVariables">
+                 <property name="text">
+                  <string> Include defined variables</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <layout class="QHBoxLayout" name="horizontalLayout_autoCompletion">
+                 <property name="topMargin">
+                  <number>10</number>
+                 </property>
+                 <item>
+                  <widget class="QLabel" name="labelAutoCompleteMode">
+                   <property name="text">
+                    <string>Mode</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="comboBoxAutoCompletionMode">
+                   <item>
+                    <property name="text">
+                     <string>Parsed File Mode</string>
+                    </property>
+                   </item>
+                   <item>
+                    <property name="text">
+                     <string>Regex Input Text Mode</string>
+                    </property>
+                   </item>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacer_40">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>40</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
                  </item>
                 </layout>
                </item>
@@ -637,7 +699,7 @@
                  <widget class="QFontComboBox" name="fontChooser">
                   <property name="currentFont">
                    <font>
-                    <family>Academy Engraved LET</family>
+                    <family>DejaVu Sans</family>
                     <pointsize>12</pointsize>
                    </font>
                   </property>
@@ -1264,12 +1326,21 @@
            <widget class="QLabel" name="labelFeatures">
             <property name="font">
              <font>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
             <property name="text">
-             <string>Features</string>
+             <string>Experimental Features</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelFeaturesDisclaimer">
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+            <property name="text">
+             <string>These features are experimental.  They may change or be removed entirely without notice. You may enable them and use them and comment on them, but you must assume that they may not be in their final form and may never appear in an OpenSCAD release in any form.</string>
             </property>
            </widget>
           </item>
@@ -1292,8 +1363,8 @@
               <rect>
                <x>0</x>
                <y>0</y>
-               <width>839</width>
-               <height>750</height>
+               <width>100</width>
+               <height>30</height>
               </rect>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_10">
@@ -1349,8 +1420,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>839</width>
-             <height>774</height>
+             <width>597</width>
+             <height>675</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_9">
@@ -1734,8 +1805,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="chokusen-down">
-                     <normaloff>.</normaloff>.</iconset>
+                    <iconset theme="chokusen-down"/>
                    </property>
                   </widget>
                  </item>
@@ -1745,8 +1815,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="chokusen-add">
-                     <normaloff>.</normaloff>.</iconset>
+                    <iconset theme="chokusen-add"/>
                    </property>
                   </widget>
                  </item>
@@ -1765,8 +1834,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="chokusen-up">
-                     <normaloff>.</normaloff>.</iconset>
+                    <iconset theme="chokusen-up"/>
                    </property>
                   </widget>
                  </item>
@@ -1785,8 +1853,7 @@
                     <string/>
                    </property>
                    <property name="icon">
-                    <iconset theme="chokusen-remove">
-                     <normaloff>.</normaloff>.</iconset>
+                    <iconset theme="chokusen-remove"/>
                    </property>
                   </widget>
                  </item>
@@ -1950,8 +2017,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>824</width>
-             <height>1276</height>
+             <width>612</width>
+             <height>1374</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_12">
@@ -2203,13 +2270,6 @@
                 <widget class="QCheckBox" name="undockCheckBox">
                  <property name="text">
                   <string>Enable undocking of helper widgets to separate windows</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="launcherBox">
-                 <property name="text">
-                  <string>Show Welcome Screen</string>
                  </property>
                 </widget>
                </item>
@@ -2689,6 +2749,43 @@
              </widget>
             </item>
             <item>
+             <widget class="QGroupBox" name="groupBox_Network">
+              <property name="title">
+               <string>Network</string>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_Network">
+               <item>
+                <layout class="QHBoxLayout" name="horizontalLayoutCaCertPath">
+                 <item>
+                  <widget class="QLabel" name="labelCaCertPath">
+                   <property name="text">
+                    <string>Custom CA certificates (PEM)</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEditCaCertPath"/>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="toolButtonCaCertBrowse">
+                   <property name="text">
+                    <string>...</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="checkBoxTlsSkipVerify">
+                 <property name="text">
+                  <string>Skip TLS certificate verification (insecure)</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
              <spacer name="verticalSpacerAdvanced">
               <property name="orientation">
                <enum>Qt::Vertical</enum>
@@ -2764,8 +2861,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>839</width>
-             <height>774</height>
+             <width>98</width>
+             <height>28</height>
             </rect>
            </property>
           </widget>
@@ -2800,8 +2897,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>839</width>
-             <height>774</height>
+             <width>98</width>
+             <height>28</height>
             </rect>
            </property>
           </widget>
@@ -2829,6 +2926,13 @@
            <string>Dialog visibility</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_19">
+           <item>
+            <widget class="QCheckBox" name="launcherBox">
+             <property name="text">
+              <string>Always show Welcome screen</string>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QCheckBox" name="checkBoxAlwaysShowExportPdfDialog">
              <property name="text">
@@ -2864,6 +2968,234 @@
             </spacer>
            </item>
           </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="pageAI">
+       <layout class="QVBoxLayout" name="verticalLayoutAI">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="labelAIHeader">
+          <property name="font">
+           <font>
+            <weight>75</weight>
+            <bold>true</bold>
+           </font>
+          </property>
+          <property name="text">
+           <string>AI Preferences</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="labelAIUnderDevWarning">
+          <property name="text">
+           <string>AI assistant integration is active. Configure your connection profiles and parameters below.</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="textFormat">
+           <enum>Qt::AutoText</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QScrollArea" name="scrollAreaAI">
+          <property name="frameShape">
+           <enum>QFrame::NoFrame</enum>
+          </property>
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="scrollAreaWidgetContentsAI">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>839</width>
+             <height>750</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayoutAIScroll">
+            <item>
+             <widget class="QGroupBox" name="groupBoxAIProfile">
+              <property name="title">
+               <string>Profiles</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayoutAIProfile">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelAIProfile">
+                 <property name="text">
+                  <string>Active Profile</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="comboBoxAIProfile"/>
+               </item>
+               <item row="0" column="2">
+                <widget class="QPushButton" name="pushButtonAINewProfile">
+                 <property name="text">
+                  <string>New Profile</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="3">
+                <widget class="QPushButton" name="pushButtonAIDeleteProfile">
+                 <property name="text">
+                  <string>Delete</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxAIConfig">
+              <property name="title">
+               <string>API Configuration</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayoutAIConfig">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelAIApiEndpoint">
+                 <property name="text">
+                  <string>API Endpoint</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLineEdit" name="lineEditAIApiEndpoint"/>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelAIApiKey">
+                 <property name="text">
+                  <string>API Key</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QLineEdit" name="lineEditAIApiKey">
+                 <property name="echoMode">
+                  <enum>QLineEdit::Password</enum>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxAISystemPrompt">
+              <property name="title">
+               <string>System Prompt / Instructions</string>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayoutAISystemPrompt">
+               <item>
+                <widget class="QPlainTextEdit" name="plainTextEditAISystemPrompt">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>80</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxAIDefaultPrompt">
+              <property name="title">
+               <string>Default User Prompt</string>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayoutAIDefaultPrompt">
+               <item>
+                <widget class="QPlainTextEdit" name="plainTextEditAIDefaultPrompt">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>60</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxAIParams">
+              <property name="title">
+               <string>API Parameters</string>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayoutAIParams">
+               <item>
+                <widget class="QTableWidget" name="tableWidgetAIParams">
+                 <property name="columnCount">
+                  <number>2</number>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="horizontalLayoutAIParamsButtons">
+                 <item>
+                  <widget class="QPushButton" name="pushButtonAIParamAdd">
+                   <property name="text">
+                    <string>Add Parameter</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="pushButtonAIParamRemove">
+                   <property name="text">
+                    <string>Remove Parameter</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <spacer name="horizontalSpacerAIParams">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>40</width>
+                     <height>20</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <spacer name="verticalSpacerAI">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -2907,6 +3239,7 @@
    <addaction name="prefsActionInputButton"/>
    <addaction name="prefsActionMouse"/>
    <addaction name="prefsActionDialogs"/>
+   <addaction name="prefsActionAI"/>
   </widget>
   <action name="prefsAction3DView">
    <property name="checkable">
@@ -2965,7 +3298,7 @@
      <normaloff>:/icons/prefsFeatures.png</normaloff>:/icons/prefsFeatures.png</iconset>
    </property>
    <property name="text">
-    <string>Features</string>
+    <string>Experimental</string>
    </property>
    <property name="toolTip">
     <string>Enable/Disable experimental features</string>
@@ -3037,10 +3370,24 @@
     <string>Dialogs</string>
    </property>
   </action>
+  <action name="prefsActionAI">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../../resources/common.qrc">
+     <normaloff>:/icons/prefsFeatures.png</normaloff>:/icons/prefsFeatures.png</iconset>
+   </property>
+   <property name="text">
+    <string>AI</string>
+   </property>
+   <property name="toolTip">
+    <string>AI and LLM configurations</string>
+   </property>
+  </action>
   <action name="actionLocalAppParameterDir">
    <property name="icon">
-    <iconset theme="chokusen-folder">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="chokusen-folder"/>
    </property>
    <property name="text">
     <string>Directory of the output file</string>
@@ -3048,8 +3395,7 @@
   </action>
   <action name="actionLocalAppParameterExtension">
    <property name="icon">
-    <iconset theme="chokusen-parameter">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="chokusen-parameter"/>
    </property>
    <property name="text">
     <string>Extension of the output file without leading dot</string>
@@ -3057,8 +3403,7 @@
   </action>
   <action name="actionLocalAppParameterSource">
    <property name="icon">
-    <iconset theme="chokusen-file">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="chokusen-file"/>
    </property>
    <property name="text">
     <string>Full path to the main source file</string>
@@ -3066,8 +3411,7 @@
   </action>
   <action name="actionLocalAppParameterSourceDir">
    <property name="icon">
-    <iconset theme="chokusen-folder">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="chokusen-folder"/>
    </property>
    <property name="text">
     <string>Directory of the main source file</string>
@@ -3075,8 +3419,7 @@
   </action>
   <action name="actionLocalAppParameterFile">
    <property name="icon">
-    <iconset theme="chokusen-orthogonal">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="chokusen-orthogonal"/>
    </property>
    <property name="text">
     <string>Full path to the output file</string>

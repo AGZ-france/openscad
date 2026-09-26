@@ -91,6 +91,7 @@
 #include <utility>
 #include <vector>
 
+#include "openscad_gui.h"
 #include "core/AST.h"
 #include "core/BuiltinContext.h"
 #include "core/Builtins.h"
@@ -117,9 +118,10 @@
 #include "glview/preview/CSGTreeNormalizer.h"
 #include "glview/preview/ThrownTogetherRenderer.h"
 #include "gui/AboutDialog.h"
-#include "gui/CGALWorker.h"
+#include "gui/GeometryWorker.h"
 #include "gui/ColorList.h"
 #include "gui/Dock.h"
+#include "gui/ai/AIDock.h"
 #include "gui/Editor.h"
 #include "gui/Export3mfDialog.h"
 #include "gui/ExportPdfDialog.h"
@@ -130,6 +132,7 @@
 #include "gui/Measurement.h"
 #include "gui/OpenSCADApp.h"
 #include "gui/Preferences.h"
+#include "Feature.h"
 #include "gui/PrintInitDialog.h"
 #include "gui/ProgressWidget.h"
 #include "gui/QGLView.h"
@@ -292,6 +295,7 @@ MainWindow::MainWindow(const QStringList& filenames) : rubberBandManager(this)
   setupErrorLog();
   setupFontList();
   setupColorList();
+  setupAIDock();
   setupDocks();
 
   setup3DView();
@@ -548,6 +552,7 @@ void MainWindow::updateUndockMode(bool undockMode)
     fontListDock->setFeatures(fontListDock->features() | QDockWidget::DockWidgetFloatable);
     colorListDock->setFeatures(colorListDock->features() | QDockWidget::DockWidgetFloatable);
     viewportControlDock->setFeatures(viewportControlDock->features() | QDockWidget::DockWidgetFloatable);
+    aiDock->setFeatures(aiDock->features() | QDockWidget::DockWidgetFloatable);
   } else {
     if (editorDock->isFloating()) {
       editorDock->setFloating(false);
@@ -589,6 +594,11 @@ void MainWindow::updateUndockMode(bool undockMode)
     }
     viewportControlDock->setFeatures(viewportControlDock->features() &
                                      ~QDockWidget::DockWidgetFloatable);
+
+    if (aiDock->isFloating()) {
+      aiDock->setFloating(false);
+    }
+    aiDock->setFeatures(aiDock->features() & ~QDockWidget::DockWidgetFloatable);
   }
 }
 
@@ -602,13 +612,72 @@ void MainWindow::updateReorderMode(bool reorderMode)
 
 MainWindow::~MainWindow()
 {
-  delete this->cgalworker;
+  // The QWidget destructor deletes our child docks, and deleting a QDockWidget
+  // reparents and hides it, which emits Dock::visibilityChanged and sends hide
+  // events through our event filter. Qt only severs connections in ~QObject,
+  // which runs last, so those slots would re-enter this MainWindow after its
+  // own members (exportMap, activeEditor, rubberBandManager, ...) have already
+  // been destroyed. Sever the links here, while the object is still whole.
+  for (auto& [dock, title] : docks) {
+    dock->disconnect(this);
+    dock->removeEventFilter(this);
+  }
+
+  delete this->geometryWorker;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+  if (!tabManager->shouldClose()) {
+    event->ignore();
+    return;
+  }
+  event->accept();
+
+  // Only save when this is the last MainWindow.
+  if (scadApp->windowManager.getWindows().size() == 1) {
+    saveWindowState();
+  }
+
+  isClosing = true;
+  progress_report_fin();
+
+  if (this->tempFile) {
+    delete this->tempFile;
+    this->tempFile = nullptr;
+  }
+
+  // Log to stdout from now on
+  clearCurrentOutput();
+  // Disable invokeMethod calls for consoleOutput during shutdown,
+  // otherwise will segfault if echos are in progress.
+  hideCurrentOutput();
+
+  // Make sure all the floating docks are closed too as those
+  // would stick around otherwise if the application keeps
+  // running (after closing just a single window, or when
+  // aborting the close process because of user cancellation).
+  for (auto& [dock, title] : docks) {
+    if (dock->isFloating()) {
+      dock->close();
+    }
+  }
+
   scadApp->windowManager.remove(this);
   if (scadApp->windowManager.getWindows().empty()) {
     // Quit application even in case some other windows like
     // Preferences are still open.
-    scadApp->quit();
+    QApplication::quit();
   }
+}
+
+void MainWindow::saveWindowState()
+{
+  QSettingsCached settings;
+  settings.setValue("window/geometry", saveGeometry());
+  auto windowState = saveState();
+  UIUtils::dumpSaveState(windowState);
+  settings.setValue("window/state", windowState);
 }
 
 void MainWindow::showProgress()
@@ -681,8 +750,7 @@ void MainWindow::compile(bool reload, bool forcedone)
     bool shouldcompiletoplevel = false;
     bool didcompile = false;
 
-    compileErrors = 0;
-    compileWarnings = 0;
+    resetCompileMessageCounts();
 
     this->renderStatistic.start();
 
@@ -845,6 +913,53 @@ void MainWindow::compileDone(bool didchange)
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+
+  if (didchange) {
+    const bool flagAutoCompleteIncludeVariables =
+      GlobalPreferences::inst()->getValue("editor/autoCompleteIncludeVariables").toBool();
+    const bool flagAutoCompleteIncludeModules =
+      GlobalPreferences::inst()->getValue("editor/autoCompleteIncludeModules").toBool();
+    const bool flagAutoCompleteIncludeFunctions =
+      GlobalPreferences::inst()->getValue("editor/autoCompleteIncludeFunctions").toBool();
+
+    const auto completionMode = Settings::SettingsAutoCompletion::autocompleteMode.value();
+
+    auto *scintillaEditor = dynamic_cast<ScintillaEditor *>(this->activeEditor);
+
+    if (scintillaEditor) {
+      if (completionMode == "ParsedFileMode") {
+        scintillaEditor->correctUserVarNamesForCompletionFromSourceFile(
+          parsedFile.get(), flagAutoCompleteIncludeVariables, flagAutoCompleteIncludeModules,
+          flagAutoCompleteIncludeFunctions);
+
+      } else if (completionMode == "RegexInputTextMode") {
+        scintillaEditor->correctUserVarNamesForCompletionFromInputText(flagAutoCompleteIncludeVariables,
+                                                                       flagAutoCompleteIncludeModules,
+                                                                       flagAutoCompleteIncludeFunctions);
+      }
+    }
+  }
+}
+
+void MainWindow::resetCompileMessageCounts()
+{
+  this->compileErrors = 0;
+  this->compileWarnings = 0;
+}
+
+// Preview and thrown-together are the two non-rendered view modes; which one a preview lands in
+// is the user's choice, and OpenCSG has to be compiled in for preview to be one of the options.
+void MainWindow::selectPreviewViewMode()
+{
+#ifdef ENABLE_OPENCSG
+  if (viewActionThrownTogether->isChecked()) {
+    viewModeThrownTogether();
+  } else {
+    viewModePreview();
+  }
+#else
+  viewModeThrownTogether();
+#endif
 }
 
 void MainWindow::compileEnded()
@@ -1516,15 +1631,6 @@ bool MainWindow::event(QEvent *event)
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
-  // OpenSCAD quits by closing all top-level windows. However, the order in which top-level are closed is
-  // not defined by Qt, so we may end up closing undocked dock widgets before we've had a chance to save
-  // their window state. This overrides close to proactively save the window state.
-  if (event->type() == QEvent::Close) {
-    if (qobject_cast<Dock *>(obj) && !static_cast<QCloseEvent *>(event)->spontaneous()) {
-      saveWindowStateOnClose();
-    }
-  }
-
   if (rubberBandManager.isVisible()) {
     if (event->type() == QEvent::KeyRelease) {
       auto keyEvent = static_cast<QKeyEvent *>(event);
@@ -1760,16 +1866,7 @@ void MainWindow::csgReloadRender()
 {
   if (this->rootNode) compileCSG();
 
-  // Go to non-CGAL view mode
-  if (viewActionThrownTogether->isChecked()) {
-    viewModeThrownTogether();
-  } else {
-#ifdef ENABLE_OPENCSG
-    viewModePreview();
-#else
-    viewModeThrownTogether();
-#endif
-  }
+  selectPreviewViewMode();
   compileEnded();
 }
 
@@ -1818,16 +1915,7 @@ void MainWindow::csgRender()
 {
   if (this->rootNode) compileCSG();
 
-  // Go to non-CGAL view mode
-  if (viewActionThrownTogether->isChecked()) {
-    viewModeThrownTogether();
-  } else {
-#ifdef ENABLE_OPENCSG
-    viewModePreview();
-#else
-    viewModeThrownTogether();
-#endif
-  }
+  selectPreviewViewMode();
 
   if (animateWidget->dumpPictures()) {
     const int steps = animateWidget->nextFrame();
@@ -1931,7 +2019,7 @@ void MainWindow::cgalRender()
   if (!isClosing) progress_report_prep(this->rootNode, report_func, this);
   else return;
 
-  this->cgalworker->start(this->tree);
+  this->geometryWorker->start(this->tree);
 }
 
 void MainWindow::actionRenderDone(const std::shared_ptr<const Geometry>& root_geom)
@@ -2930,6 +3018,28 @@ void MainWindow::onParametersDockVisibilityChanged(bool isVisible)
   }
 }
 
+void MainWindow::onAIDockVisibilityChanged(bool isVisible)
+{
+}
+
+void MainWindow::onExperimentalChanged()
+{
+  bool aiEnabled = Feature::ExperimentalAiFeatures.is_enabled();
+  if (this->aiDock) {
+    this->aiDock->toggleViewAction()->setVisible(aiEnabled);
+    if (!aiEnabled) {
+      this->aiDock->hide();
+    }
+    if (this->navigationMenu) {
+      for (auto *action : this->navigationMenu->actions()) {
+        if (action->text() == _("&AI Chat")) {
+          action->setVisible(aiEnabled);
+        }
+      }
+    }
+  }
+}
+
 void MainWindow::onColorListColorSelected(const QString& selectedColor)
 {
   activeEditor->insertOrReplaceText(selectedColor);
@@ -3235,42 +3345,6 @@ void MainWindow::on_helpActionLibraryInfo_triggered()
   this->libraryInfoDialog->show();
 }
 
-void MainWindow::saveWindowStateOnClose()
-{
-  if (windowStateSaved) return;
-  windowStateSaved = true;
-
-  QSettingsCached settings;
-  settings.setValue("window/geometry", saveGeometry());
-  auto windowState = saveState();
-  UIUtils::dumpSaveState(windowState);
-  settings.setValue("window/state", windowState);
-}
-
-void MainWindow::closeEvent(QCloseEvent *event)
-{
-  if (tabManager->shouldClose()) {
-    isClosing = true;
-    saveWindowStateOnClose();
-    progress_report_fin();
-
-    // Log to stdout from now on
-    clearCurrentOutput();
-
-    if (this->tempFile) {
-      delete this->tempFile;
-      this->tempFile = nullptr;
-    }
-
-    // Disable invokeMethod calls for consoleOutput during shutdown,
-    // otherwise will segfault if echos are in progress.
-    hideCurrentOutput();
-    event->accept();
-  } else {
-    event->ignore();
-  }
-}
-
 void MainWindow::on_editActionPreferences_triggered()
 {
   GlobalPreferences::inst()->update();
@@ -3430,8 +3504,8 @@ void MainWindow::setupCoreSubsystems()
   renderCompleteSoundEffect = new QSoundEffect(this);
   renderCompleteSoundEffect->setSource(QUrl("qrc:/sounds/complete.wav"));
 
-  this->cgalworker = new CGALWorker();
-  connect(this->cgalworker, &CGALWorker::done, this, &MainWindow::actionRenderDone);
+  this->geometryWorker = new GeometryWorker();
+  connect(this->geometryWorker, &GeometryWorker::done, this, &MainWindow::actionRenderDone);
 
   autoReloadTimer = new QTimer(this);
   autoReloadTimer->setSingleShot(false);
@@ -3489,6 +3563,10 @@ void MainWindow::setupPreferences()
           Qt::UniqueConnection);
   connect(GlobalPreferences::inst()->AxisConfig, &AxisConfigWidget::inputGainChanged,
           InputDriverManager::instance(), &InputDriverManager::onInputGainUpdated, Qt::UniqueConnection);
+
+  connect(GlobalPreferences::inst(), &Preferences::ExperimentalChanged, this,
+          &MainWindow::onExperimentalChanged);
+  onExperimentalChanged();
 }
 
 /**
@@ -3563,6 +3641,8 @@ void MainWindow::setupEditor(const QStringList& filenames)
   connect(this->editActionUnindent, &QAction::triggered, tabManager, &TabManager::unindentSelection);
   connect(this->editActionComment, &QAction::triggered, tabManager, &TabManager::commentSelection);
   connect(this->editActionUncomment, &QAction::triggered, tabManager, &TabManager::uncommentSelection);
+  connect(this->editActionMoveLineUp, &QAction::triggered, tabManager, &TabManager::moveLineUp);
+  connect(this->editActionMoveLineDown, &QAction::triggered, tabManager, &TabManager::moveLineDown);
 
   connect(this->editActionToggleBookmark, &QAction::triggered, tabManager, &TabManager::toggleBookmark);
   connect(this->editActionNextBookmark, &QAction::triggered, tabManager, &TabManager::nextBookmark);
@@ -3634,6 +3714,18 @@ void MainWindow::setupViewportControl()
 }
 
 /**
+  Setup AIDock
+ */
+void MainWindow::setupAIDock()
+{
+  this->aiDock = new AIDock(this);
+  addDockWidget(Qt::RightDockWidgetArea, this->aiDock);
+  this->aiDock->hide();
+
+  QObject::connect(this->aiDock, &Dock::visibilityChanged, this, &MainWindow::onAIDockVisibilityChanged);
+}
+
+/**
   Set up resources related to the 3d View
  */
 void MainWindow::setup3DView()
@@ -3695,11 +3787,12 @@ void MainWindow::setupDocks()
     {editorDock, _("&Editor")},
     {consoleDock, _("&Console")},
     {parameterDock, _("C&ustomizer")},
-    {errorLogDock, _("Error-&Log")},
+    {errorLogDock, _("Error &Log")},
     {animateDock, _("&Animate")},
     {fontListDock, _("&Font List")},
     {colorListDock, _("C&olor List")},
-    {viewportControlDock, _("&Viewport-Control")},
+    {viewportControlDock, _("&Viewport Control")},
+    {aiDock,_("&AI Chat")}
   };
   // clang-format off
 
@@ -3780,7 +3873,7 @@ void MainWindow::setupMenusAndActions()
 #endif
 
 
-  connect(this->fileActionQuit, &QAction::triggered, scadApp, &OpenSCADApp::quit, Qt::QueuedConnection);
+  connect(this->fileActionQuit, &QAction::triggered, scadApp, &OpenSCADApp::closeApp, Qt::QueuedConnection);
 
 #ifdef ENABLE_PYTHON
 #else
@@ -3810,7 +3903,6 @@ void MainWindow::setupMenusAndActions()
   exportMap[FileFormat::OFF] = this->fileActionExportOFF;
   exportMap[FileFormat::WRL] = this->fileActionExportWRL;
   exportMap[FileFormat::POV] = this->fileActionExportPOV;
-  exportMap[FileFormat::AMF] = this->fileActionExportAMF;
   exportMap[FileFormat::DXF] = this->fileActionExportDXF;
   exportMap[FileFormat::SVG] = this->fileActionExportSVG;
   exportMap[FileFormat::PDF] = this->fileActionExportPDF;
@@ -3918,13 +4010,7 @@ void MainWindow::setupMenusAndActions()
 void MainWindow::restoreWindowState()
 {
   const QSettingsCached settings;
-  // fetch window states to be restored after restoreState() call
-  const bool isEditorToolbarVisible = !settings.value("view/hideEditorToolbar").toBool();
-  const bool is3DViewToolbarVisible = !settings.value("view/hide3DViewToolbar").toBool();
-
-  // make sure it looks nice..
   const auto windowState = settings.value("window/state", QByteArray()).toByteArray();
-  // Log to stdout
   clearCurrentOutput();
   UIUtils::dumpSaveState(windowState);
   setCurrentOutput();
@@ -3958,7 +4044,14 @@ void MainWindow::restoreWindowState()
     tabifyDockWidget(errorLogDock, fontListDock);
     tabifyDockWidget(fontListDock, colorListDock);
     tabifyDockWidget(colorListDock, animateDock);
+    tabifyDockWidget(animateDock, viewportControlDock);
+    tabifyDockWidget(parameterDock, aiDock);
     parameterDock->hide();
+    aiDock->hide();
+    errorLogDock->hide();
+    fontListDock->hide();
+    colorListDock->hide();
+    animateDock->hide();
     viewportControlDock->hide();
     consoleDock->show();
     consoleDock->raise();
@@ -3989,4 +4082,12 @@ void MainWindow::openRemainingFiles(const QStringList& filenames)
   for (int i = 1; i < filenames.size(); ++i) tabManager->createTab(filenames[i]);
 
   activeEditor->setFocus();
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+  if (event->type() == QEvent::ThemeChange) {
+    setGlobalTheme();
+  }
+  QMainWindow::changeEvent(event);
 }
