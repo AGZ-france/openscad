@@ -55,6 +55,7 @@
 #include "version.h"
 // hash double
 #include "geometry/linalg.h"
+#include "handle_dep.h"
 
 #if defined __WIN32__ || defined _MSC_VER
 #include <process.h>
@@ -584,7 +585,7 @@ Value builtin_object(const std::shared_ptr<const Context>& context, const Functi
   for (Context *c : contexts) {
     c->set_variable(Parameters::THIS_CONTEXT, object.clone());
   }
-  return std::move(object);
+  return object;
 }
 
 Value builtin_has_key(Arguments arguments, const Location& loc)
@@ -743,8 +744,13 @@ static VectorType search(const str_utf8_wrapper& find, const VectorType& table,
             j, (index_col_num + 1), table[j].toEchoStringNoThrow());
         return {session};
       }
-      if (!ft.empty() &&
-          ft.get_utf8_char() == entryVec[index_col_num].toStrUtf8Wrapper().get_utf8_char()) {
+      const auto& entry = entryVec[index_col_num];
+      if (entry.type() != Value::Type::STRING) {
+        // Just as "==" silently treats a type mismatch as not-equal, we treat a type mismatch
+        // as not matching.
+        continue;
+      }
+      if (!ft.empty() && ft.get_utf8_char() == entry.toStrUtf8Wrapper().get_utf8_char()) {
         matchCount++;
         if (num_returns_per_match == 1) {
           returnvec.emplace_back(double(j));
@@ -1098,11 +1104,37 @@ Value builtin_is_object(Arguments arguments, const Location& loc)
 Value builtin_import(Arguments arguments, const Location& loc)
 {
   auto session = arguments.session();
-  const Parameters parameters = Parameters::parse(std::move(arguments), loc, {}, {"file"});
+  const Parameters parameters = Parameters::parse(std::move(arguments), loc, {}, {"file", "type"});
+  std::string type = parameters.get("type", "");
   std::string raw_filename = parameters.get("file", "");
-  std::string file =
-    lookup_file(raw_filename, loc.filePath().parent_path().string(), parameters.documentRoot());
-  return import_json(file, session, loc);
+
+  std::string file = lookup_file(raw_filename, loc.filePath().parent_path().string());
+  if (!file.empty()) handle_dep(file);
+
+  if (type.empty()) {
+    // Not explicitly specified; derive the file type from its extension.
+    std::string extraw = fs::path(file).extension().generic_string();
+    std::string ext = boost::algorithm::to_lower_copy(extraw);
+    if (ext == ".json") {
+      type = "json";
+    } else if (ext.empty()) {
+      LOG(message_group::Warning, loc, arguments.documentRoot(),
+          "No file extension or type while trying to import '%1$s'", raw_filename);
+      return Value::undefined.clone();
+    } else {
+      LOG(message_group::Warning, loc, arguments.documentRoot(),
+          "Unsupported file extension '%1$s' while trying to import '%2$s'", ext, raw_filename);
+      return Value::undefined.clone();
+    }
+  }
+
+  if (type == "json") {
+    return import_json(file, session, loc);
+  } else {
+    LOG(message_group::Warning, loc, arguments.documentRoot(),
+        "Unsupported file type '%1$s' while trying to import '%2$s'", type, raw_filename);
+    return Value::undefined.clone();
+  }
 }
 
 void register_builtin_functions()

@@ -424,6 +424,9 @@ public:
   static SettingsEntryList<LocalAppParameter> localAppParameterList;
   static SettingsEntryEnum<std::string> localAppFileFormat;
 
+  static SettingsEntryString caCertPath;
+  static SettingsEntryBool tlsSkipVerify;
+
   static SettingsEntryBool manifoldEnabled;
   static SettingsEntryEnum<std::string> renderBackend3D;
   static SettingsEntryEnum<std::string> toolbarExport3D;
@@ -631,6 +634,12 @@ public:
   virtual ~SettingsVisitor() = default;
 
   virtual void handle(SettingsEntryBase& entry) const = 0;
+};
+
+class SettingsAutoCompletion
+{
+public:
+  static SettingsEntryEnum<std::string> autocompleteMode;
 };
 
 }  // namespace Settings

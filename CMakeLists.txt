@@ -614,6 +614,15 @@ message(STATUS "LibXml2: ${LIBXML2_VERSION_STRING}")
 target_link_libraries(OpenSCADLibInternal PUBLIC LibXml2::LibXml2)
 target_link_libraries(svg PUBLIC LibXml2::LibXml2)
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+  find_package(OpenSSL REQUIRED)
+  message(STATUS "OpenSSL: ${OPENSSL_VERSION}")
+  target_link_libraries(OpenSCADLibInternal PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+  if(WIN32)
+    target_link_libraries(OpenSCADLibInternal PUBLIC crypt32 ws2_32)
+  endif()
+endif()
+
 if(ENABLE_PYTHON)
   find_package(Python REQUIRED COMPONENTS Interpreter Development)
   find_package(Nettle 3.4 REQUIRED)
@@ -979,7 +988,10 @@ elseif(WIN32)
   if(NOT NULLGL)
     set(OFFSCREEN_METHOD "Windows WGL")
     message(STATUS "Offscreen OpenGL Context - using Microsoft WGL")
-    set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/offscreen-old/OffscreenContextWGL.cc)
+    set(PLATFORM_SOURCES ${PLATFORM_SOURCES}
+        src/glview/offscreen-old/OffscreenContextWGL.cc
+        src/glview/OffscreenContextWGL.cc)
+
   endif()
 endif()
 
@@ -1036,14 +1048,21 @@ set(CORE_SOURCES
   src/core/TransformNode.cc
   src/core/Tree.cc
   src/core/UndefType.cc
+  src/core/UnicodeIdentifier.cc
   src/core/UserModule.cc
   src/core/Value.cc
   src/core/builtin_functions.cc
   src/core/control.cc
+  src/core/HTTPClient.cc
+  src/core/AIClient.cc
+  src/core/AIService.cc
   src/core/customizer/Annotation.cc
   src/core/customizer/CommentParser.cc
   src/core/customizer/ParameterObject.cc
   src/core/customizer/ParameterSet.cc
+  src/core/HelicoidalExtrude.cc
+  src/core/HelicoidalExtrudeNode.h
+  src/ext/lodepng/lodepng.cpp
   src/core/function.cc
   src/core/module.cc
   src/core/node.cc
@@ -1073,6 +1092,7 @@ set(CORE_SOURCES
   src/geometry/rotate_extrude.cc
   src/glview/Camera.cc
   src/glview/ColorMap.cc
+  src/glview/CsgInfo.cc
   src/glview/OffscreenContextFactory.cc
   src/glview/RenderSettings.cc
   src/glview/preview/CSGTreeNormalizer.cc
@@ -1080,7 +1100,6 @@ set(CORE_SOURCES
   src/io/DxfData.cc
   src/io/dxfdim.cc
   src/io/export.cc
-  src/io/export_amf.cc
   src/io/export_dxf.cc
   src/io/export_obj.cc
   src/io/export_off.cc
@@ -1092,7 +1111,6 @@ set(CORE_SOURCES
   src/io/export_param.cc
   src/io/export_wrl.cc
   src/io/fileutils.cc
-  src/io/import_amf.cc
   src/io/import_json.cc
   src/io/import_obj.cc
   src/io/import_off.cc
@@ -1130,6 +1148,8 @@ if(EXPERIMENTAL AND ENABLE_CGAL)
 endif()
 
 set(CGAL_SOURCES
+  src/geometry/GeometryEvaluator2.cc
+  src/geometry/GeometryEvaluator.cc
   src/geometry/cgal/cgalutils.cc
   src/geometry/cgal/cgalutils-applyops.cc
   src/geometry/cgal/cgalutils-applyops-minkowski.cc
@@ -1283,7 +1303,7 @@ set(GUI_SOURCES
   ${GUI_SOURCES}
   src/openscad_gui.cc
   src/gui/AutoUpdater.cc
-  src/gui/CGALWorker.cc
+  src/gui/GeometryWorker.cc
   src/gui/ViewportControl.cc
   src/gui/Console.cc
   src/gui/Dock.cc
@@ -1344,6 +1364,10 @@ set(GUI_SOURCES
   src/gui/parameter/ParameterVector.cc
   src/gui/parameter/ParameterVirtualWidget.cc
   src/gui/parameter/ParameterWidget.cc
+  src/gui/ai/AIDock.cc
+  src/gui/ai/ChatWidget.cc
+  src/gui/ai/ChatInputEdit.cc
+  src/gui/ai/ViewportGrabber.cc
   ${INPUT_DRIVER_SOURCES}
   )
 
@@ -1359,7 +1383,7 @@ set(GUI_HEADERS
     src/gui/Animate.h
     src/gui/AppleEvents.h
     src/gui/AutoUpdater.h
-    src/gui/CGALWorker.h
+    src/gui/GeometryWorker.h
     src/gui/Console.h
     src/gui/Dock.h
     src/gui/Editor.h
@@ -1414,11 +1438,17 @@ set(GUI_HEADERS
     src/gui/parameter/ParameterVector.h
     src/gui/parameter/ParameterVirtualWidget.h
     src/gui/parameter/ParameterWidget.h
+    src/gui/ai/AIDock.h
+    src/gui/ai/ChatWidget.h
+    src/gui/ai/DiffDialog.h
+    src/gui/ai/CollapsibleBubble.h
+    src/gui/ai/ChatInputEdit.h
 )
 
 # To be added in Source for QtCreator to show them in project tree
 set(GUI_UIS
     ${GUI_UIS}
+    src/gui/ai/ChatWidget.ui
     src/gui/AboutDialog.ui
     src/gui/Animate.ui
     src/gui/Console.ui
@@ -1554,6 +1584,8 @@ endif()
 
 file(GLOB_RECURSE TEST_SOURCES
   "src/utils/*_test.cc"
+  "src/core/*_test.cc"
+  "src/io/*_test.cc"
 )
 file(GLOB_RECURSE GUI_TEST_SOURCES
   "src/gui/*_test.cc"
@@ -1775,6 +1807,8 @@ if(ENABLE_TESTS)
       add_executable(OpenSCADUnitTests ${TEST_SOURCES} ${GUI_TEST_SOURCES})
     endif()
     target_link_libraries(OpenSCADUnitTests PRIVATE Catch2::Catch2WithMain OpenSCADLibInternal svg)
+    target_compile_definitions(OpenSCADUnitTests PRIVATE
+      OPENSCAD_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
     include(CTest)
     include(Catch)
     catch_discover_tests(OpenSCADUnitTests ADD_TAGS_AS_LABELS)
