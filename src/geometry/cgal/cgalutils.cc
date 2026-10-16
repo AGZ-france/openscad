@@ -92,6 +92,7 @@ std::unique_ptr<CGALNefGeometry> createNefPolyhedronFromPolySet(const PolySet& p
   auto plane_error = false;
   try {
     CGAL_Polyhedron P;
+    //LOG("call CGALUtils::createPolyhedronFromPolySet %1$d", psq.vertices.size());
     auto err = CGALUtils::createPolyhedronFromPolySet(psq, P);
     if (!err) {
       if (!P.is_closed()) {
